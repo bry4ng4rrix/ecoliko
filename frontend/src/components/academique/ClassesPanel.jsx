@@ -3,10 +3,13 @@ import { Plus, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useCreateResource, useDeleteResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
-import { classeService, etudiantService, filiereService, salleService, staffService } from '@/services'
+import { classeService, etudiantService, salleService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
 
-const EMPTY_FORM = { nom: '', section: '', filiere: '', capacite_max: 40, titulaire: '', salle: '', delegue: '' }
+const EMPTY_FORM = {
+  nom: '', section: '', capacite_max: 40, titulaire: '', salle: '', delegue: '',
+  frais_ecolage_mensuel: '', frais_inscription: '',
+}
 
 export function ClassesPanel() {
   const [showForm, setShowForm] = useState(false)
@@ -14,7 +17,6 @@ export function ClassesPanel() {
   const [form, setForm] = useState(EMPTY_FORM)
 
   const { data: classes, isLoading } = useResourceList('classes', classeService)
-  const { data: filieres } = useResourceList('filieres', filiereService)
   const { data: salles } = useResourceList('salles', salleService)
   const { data: personnel } = useResourceList('personnel', staffService)
   const { data: etudiants } = useResourceList('etudiants', etudiantService)
@@ -29,9 +31,10 @@ export function ClassesPanel() {
   const startEdit = (cls) => {
     setEditing(cls.id)
     setForm({
-      nom: cls.nom, section: cls.section ?? '', filiere: cls.filiere ? String(cls.filiere) : '',
+      nom: cls.nom, section: cls.section ?? '',
       capacite_max: cls.capacite_max, titulaire: cls.titulaire ? String(cls.titulaire) : '',
       salle: cls.salle ? String(cls.salle) : '', delegue: cls.delegue ? String(cls.delegue) : '',
+      frais_ecolage_mensuel: cls.frais_ecolage_mensuel ?? '', frais_inscription: cls.frais_inscription ?? '',
     })
     setShowForm(true)
   }
@@ -46,11 +49,12 @@ export function ClassesPanel() {
     e.preventDefault()
     const payload = {
       nom: form.nom, section: form.section || null,
-      filiere: form.filiere ? Number(form.filiere) : null,
       capacite_max: Number(form.capacite_max),
       titulaire: form.titulaire ? Number(form.titulaire) : null,
       salle: form.salle ? Number(form.salle) : null,
       delegue: form.delegue ? Number(form.delegue) : null,
+      frais_ecolage_mensuel: form.frais_ecolage_mensuel !== '' ? Number(form.frais_ecolage_mensuel) : null,
+      frais_inscription: form.frais_inscription !== '' ? Number(form.frais_inscription) : null,
     }
     try {
       if (editing) {
@@ -95,20 +99,13 @@ export function ClassesPanel() {
               name="section" value={form.section} onChange={handleChange} placeholder="Section (ex: Bilingue, facultatif)"
               className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
-            <select
-              name="filiere" value={form.filiere} onChange={handleChange}
-              className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="">Sans filière</option>
-              {(filieres ?? []).map((f) => <option key={f.id} value={f.id}>{f.intitule}</option>)}
-            </select>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               name="capacite_max" type="number" min="1" value={form.capacite_max} onChange={handleChange}
               placeholder="Capacité max"
               className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <select
               name="titulaire" value={form.titulaire} onChange={handleChange}
               className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
@@ -123,6 +120,18 @@ export function ClassesPanel() {
               <option value="">Sans salle assignée</option>
               {(salles ?? []).map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
             </select>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              name="frais_ecolage_mensuel" type="number" min="0" step="0.01" value={form.frais_ecolage_mensuel}
+              onChange={handleChange} placeholder="Écolage mensuel (Ar/mois, ex: 100000)"
+              className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <input
+              name="frais_inscription" type="number" min="0" step="0.01" value={form.frais_inscription}
+              onChange={handleChange} placeholder="Droit d'inscription / réinscription (Ar)"
+              className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
           </div>
           {editing && (
             <select
@@ -166,10 +175,15 @@ export function ClassesPanel() {
               </div>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
-              {cls.filiere_intitule && <p>Filière: <span className="font-semibold text-foreground">{cls.filiere_intitule}</span></p>}
               <p>Prof principal: <span className="font-semibold text-foreground">{cls.titulaire_nom ?? 'À assigner'}</span></p>
               <p>Salle: <span className="font-semibold text-foreground">{cls.salle_nom ?? 'Non assignée'}</span></p>
               <p>Délégué de classe: <span className="font-semibold text-foreground">{cls.delegue_nom ?? 'À désigner'}</span></p>
+              {cls.frais_ecolage_mensuel && (
+                <p>Écolage: <span className="font-semibold text-foreground">{Number(cls.frais_ecolage_mensuel).toLocaleString('fr-FR')} Ar/mois</span></p>
+              )}
+              {cls.frais_inscription && (
+                <p>Inscription/réinscription: <span className="font-semibold text-foreground">{Number(cls.frais_inscription).toLocaleString('fr-FR')} Ar</span></p>
+              )}
             </div>
           </div>
         ))}

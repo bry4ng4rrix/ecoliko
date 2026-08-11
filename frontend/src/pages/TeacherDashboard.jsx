@@ -15,7 +15,7 @@ import { useAnneeActive } from '@/hooks/useAnneeActive'
 import { useCreateResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
 import {
   classeService, dossierEnseignantService, emploiDuTempsService, enregistrerAppel, etudiantService,
-  genererBulletin, matiereService, niveauService, noteService, presenceService, trimestreService,
+  genererBulletin, matiereService, noteService, presenceService, trimestreService,
 } from '@/services'
 import { authService } from '@/services/authService'
 import { NotificationBell } from '@/components/NotificationBell'
@@ -313,8 +313,7 @@ function MonEmploiDuTempsPanel() {
 function AjouterMatiereForm() {
   const { user } = useAuth()
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ code: '', intitule: '', niveau: '', coefficient: 1 })
-  const { data: niveaux } = useResourceList('niveaux', niveauService)
+  const [form, setForm] = useState({ code: '', intitule: '', coefficient: 1 })
   const createMatiere = useCreateResource('matieres', matiereService)
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -323,11 +322,11 @@ function AjouterMatiereForm() {
     e.preventDefault()
     try {
       await createMatiere.mutateAsync({
-        code: form.code, intitule: form.intitule, niveau: Number(form.niveau),
-        coefficient: Number(form.coefficient), enseignant: user.id, filiere: null,
+        code: form.code, intitule: form.intitule,
+        coefficient: Number(form.coefficient), enseignant: user.id,
       })
       toast.success('Matière ajoutée.')
-      setForm({ code: '', intitule: '', niveau: '', coefficient: 1 })
+      setForm({ code: '', intitule: '', coefficient: 1 })
       setShowForm(false)
     } catch (err) {
       const data = err.response?.data
@@ -359,13 +358,6 @@ function AjouterMatiereForm() {
           className="px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
-      <select
-        name="niveau" value={form.niveau} onChange={handleChange} required
-        className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-      >
-        <option value="">Choisir un niveau</option>
-        {(niveaux ?? []).map((n) => <option key={n.id} value={n.id}>{n.intitule}</option>)}
-      </select>
       <div className="flex gap-2">
         <Button type="submit" size="sm" disabled={createMatiere.isPending}>Ajouter</Button>
         <Button type="button" size="sm" variant="secondary" onClick={() => setShowForm(false)}>Annuler</Button>

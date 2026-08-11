@@ -180,7 +180,7 @@ function AdminDashboard() {
         </div>
 
         <div className="flex gap-2 border-b border-border">
-          {['classes', 'matieres', 'salles'].map(tab => (
+          {['classes', 'matieres', 'salles', 'annee-scolaire'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveSubTab(tab)}
@@ -191,6 +191,7 @@ function AdminDashboard() {
               {tab === 'classes' && 'Classes'}
               {tab === 'matieres' && 'Matières'}
               {tab === 'salles' && 'Salles'}
+              {tab === 'annee-scolaire' && 'Année scolaire'}
             </button>
           ))}
         </div>
@@ -198,6 +199,7 @@ function AdminDashboard() {
         {activeSubTab === 'classes' && <ClassesPanel />}
         {activeSubTab === 'matieres' && <MatieresPanel />}
         {activeSubTab === 'salles' && <SallesPanel />}
+        {activeSubTab === 'annee-scolaire' && <AnneesScolairesPanel />}
       </div>
     )
   }
@@ -322,10 +324,9 @@ function AdminDashboard() {
           <EcoleInfoPanel />
         </div>
 
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-xl font-bold mb-6">Année scolaire</h2>
-          <AnneesScolairesPanel />
-        </div>
+        <p className="text-sm text-muted-foreground">
+          La gestion de l'année scolaire se trouve désormais dans <span className="font-semibold">Gestion Académique</span>.
+        </p>
 
         <div className="bg-card rounded-lg border border-border p-6">
           <h2 className="text-xl font-bold mb-6">Règles académiques</h2>

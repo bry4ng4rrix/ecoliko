@@ -95,7 +95,7 @@ class ClasseSerializer(ValidatedModelSerializer):
             'id', 'annee_scolaire', 'niveau', 'niveau_intitule', 'filiere', 'filiere_intitule',
             'nom', 'section', 'capacite_max', 'titulaire', 'titulaire_nom', 'salle', 'salle_nom',
             'delegue', 'delegue_nom', 'delegue_utilisateur', 'enseignants', 'enseignants_noms',
-            'est_active', 'effectif', 'date_creation',
+            'frais_ecolage_mensuel', 'frais_inscription', 'est_active', 'effectif', 'date_creation',
         )
         read_only_fields = ('annee_scolaire', 'date_creation')
 

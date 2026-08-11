@@ -13,14 +13,20 @@ from ..models import Etudiant, AnneeScolaire, FraisScolarite, PaiementEcolage
 def frais_attendus(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> Decimal:
     """Montant total dû (inscription + écolage annuel) pour cet étudiant sur cette année.
 
-    Basé sur le tarif de son niveau/filière courants dans cette année ; 0 si aucun tarif configuré.
+    Priorité au tarif renseigné directement sur la classe (`Classe.frais_ecolage_mensuel` /
+    `frais_inscription`) ; à défaut, tarif configuré par niveau/filière (`FraisScolarite`,
+    pour compatibilité avec les établissements déjà configurés ainsi). 0 si rien n'est renseigné.
     """
     inscription = etudiant.inscriptions.filter(annee_scolaire=annee_scolaire).select_related('classe').first()
     if inscription is None:
         return Decimal('0')
+    classe = inscription.classe
+
+    if classe.frais_ecolage_mensuel is not None or classe.frais_inscription is not None:
+        return (classe.frais_inscription or Decimal('0')) + (classe.frais_ecolage_mensuel or Decimal('0')) * 12
 
     tarif = FraisScolarite.objects.filter(
-        annee_scolaire=annee_scolaire, niveau=inscription.classe.niveau, filiere=inscription.classe.filiere
+        annee_scolaire=annee_scolaire, niveau=classe.niveau, filiere=classe.filiere
     ).first()
     if tarif is None:
         return Decimal('0')

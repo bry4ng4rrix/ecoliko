@@ -373,10 +373,13 @@ const STATUT_PAIEMENT_VARIANT = {
 
 function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const anneeActive = useAnneeActive()
+  const queryClient = useQueryClient()
   const { data: paiements, isLoading: loadingPaiements } = useResourceList('paiements', paiementService)
   const { data: fraisScolarite } = useResourceList('frais-scolarite', fraisScolariteService)
   const { data: classes } = useResourceList('classes', classeService)
   const { data: inscriptions } = useResourceList('inscriptions', inscriptionService)
+  const createPaiement = useCreateResource('paiements', paiementService)
+  const updatePaiement = useUpdateResource('paiements', paiementService)
 
   const { data: dossier, isLoading: loadingDossier } = useQuery({
     queryKey: ['dossier-financier', etudiant.id, anneeActive?.id],
@@ -388,12 +391,18 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     (i) => i.etudiant === etudiant.id && i.annee_scolaire === anneeActive?.id
   )
   const classeActuelle = inscriptionActive ? (classes ?? []).find((c) => c.id === inscriptionActive.classe) : null
-  const tarif = classeActuelle
+  const tarifNiveau = classeActuelle
     ? (fraisScolarite ?? []).find(
         (f) => f.annee_scolaire === anneeActive?.id && f.niveau === classeActuelle.niveau
           && (f.filiere ?? null) === (classeActuelle.filiere ?? null)
       )
     : null
+
+  // Le tarif renseigné directement sur la classe prime sur celui par niveau/filière (voir
+  // `services.finance.frais_attendus` côté backend — même logique de priorité ici).
+  const montantInscription = classeActuelle?.frais_inscription ?? tarifNiveau?.montant_inscription ?? null
+  const montantEcolageMensuel = classeActuelle?.frais_ecolage_mensuel
+    ?? (tarifNiveau ? Number(tarifNiveau.montant_annuel) / 12 : null)
 
   const mesPaiements = (paiements ?? []).filter(
     (p) => p.etudiant === etudiant.id && p.annee_scolaire === anneeActive?.id
@@ -401,9 +410,52 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const totalPayeEcolage = mesPaiements
     .filter((p) => p.statut === 'PAYE')
     .reduce((somme, p) => somme + Number(p.montant), 0)
-  const droitInscriptionPaye = tarif ? totalPayeEcolage >= Number(tarif.montant_inscription) : false
+  const droitInscriptionPaye = montantInscription != null && totalPayeEcolage >= Number(montantInscription)
 
   const paiementsParMois = (mois) => mesPaiements.filter((p) => p.mois_couvert === mois)
+
+  const dateEcheancePourMois = (mois) => {
+    const anneeDebut = new Date(anneeActive.date_debut).getFullYear()
+    const annee = mois >= 9 ? anneeDebut : anneeDebut + 1
+    return `${annee}-${String(mois).padStart(2, '0')}-05`
+  }
+
+  const invaliderFinance = () => {
+    queryClient.invalidateQueries({ queryKey: ['paiements'] })
+    queryClient.invalidateQueries({ queryKey: ['dossier-financier', etudiant.id, anneeActive?.id] })
+  }
+
+  const handleMarquerPaye = async (mois) => {
+    const existant = paiementsParMois(mois)[0]
+    try {
+      if (existant) {
+        await updatePaiement.mutateAsync({ id: existant.id, payload: { statut: 'PAYE' } })
+      } else {
+        await createPaiement.mutateAsync({
+          etudiant: etudiant.id, annee_scolaire: anneeActive.id,
+          montant: montantEcolageMensuel ?? 0, date_echeance: dateEcheancePourMois(mois),
+          mois_couvert: mois, statut: 'PAYE',
+        })
+      }
+      invaliderFinance()
+      toast.success('Mois marqué comme payé.')
+    } catch (err) {
+      const data = err.response?.data
+      toast.error(data ? Object.values(data).flat().join(' ') : 'Erreur lors de la mise à jour.')
+    }
+  }
+
+  const handleMarquerNonPaye = async (mois) => {
+    const existant = paiementsParMois(mois)[0]
+    if (!existant) return
+    try {
+      await updatePaiement.mutateAsync({ id: existant.id, payload: { statut: 'EN_ATTENTE' } })
+      invaliderFinance()
+      toast.success('Mois marqué comme non payé.')
+    } catch {
+      toast.error('Erreur lors de la mise à jour.')
+    }
+  }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -443,22 +495,26 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
 
             <div>
               <h3 className="font-semibold text-sm mb-2">Frais généraux</h3>
-              {!tarif ? (
-                <p className="text-sm text-muted-foreground">Aucun tarif configuré pour son niveau cette année.</p>
+              {montantInscription == null && montantEcolageMensuel == null ? (
+                <p className="text-sm text-muted-foreground">Aucun tarif configuré (ni sur la classe, ni par niveau) pour cette année.</p>
               ) : (
                 <div className="flex flex-wrap gap-3">
                   <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
                     <span className="text-sm">Droit d'inscription / réinscription</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono">{Number(tarif.montant_inscription).toLocaleString('fr-FR')} Ar</span>
+                      <span className="text-sm font-mono">
+                        {montantInscription != null ? `${Number(montantInscription).toLocaleString('fr-FR')} Ar` : '—'}
+                      </span>
                       <Badge variant={droitInscriptionPaye ? 'default' : 'destructive'}>
                         {droitInscriptionPaye ? 'Payé' : 'Pas encore payé'}
                       </Badge>
                     </div>
                   </div>
                   <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
-                    <span className="text-sm">Écolage annuel</span>
-                    <span className="text-sm font-mono">{Number(tarif.montant_annuel).toLocaleString('fr-FR')} Ar</span>
+                    <span className="text-sm">Écolage mensuel</span>
+                    <span className="text-sm font-mono">
+                      {montantEcolageMensuel != null ? `${Number(montantEcolageMensuel).toLocaleString('fr-FR')} Ar/mois` : '—'}
+                    </span>
                   </div>
                 </div>
               )}
@@ -474,18 +530,28 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                       <th className="px-3 py-2 text-left">Montant</th>
                       <th className="px-3 py-2 text-left">Date</th>
                       <th className="px-3 py-2 text-left">Statut</th>
+                      <th className="px-3 py-2 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {MOIS_LABELS.map((label, i) => {
                       const mois = i + 1
                       const lignes = paiementsParMois(mois)
+                      const dejaPaye = lignes.some((p) => p.statut === 'PAYE')
                       if (lignes.length === 0) {
                         return (
                           <tr key={mois}>
                             <td className="px-3 py-2">{label}</td>
                             <td className="px-3 py-2 text-muted-foreground" colSpan={2}>—</td>
                             <td className="px-3 py-2"><Badge variant="secondary">Non payé</Badge></td>
+                            <td className="px-3 py-2 text-center">
+                              <button
+                                type="button" onClick={() => handleMarquerPaye(mois)}
+                                className="text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
+                              >
+                                Marquer payé
+                              </button>
+                            </td>
                           </tr>
                         )
                       }
@@ -496,6 +562,23 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                           <td className="px-3 py-2 text-muted-foreground">{p.date_paiement}</td>
                           <td className="px-3 py-2">
                             <Badge variant={STATUT_PAIEMENT_VARIANT[p.statut] ?? 'secondary'}>{p.statut}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {dejaPaye ? (
+                              <button
+                                type="button" onClick={() => handleMarquerNonPaye(mois)}
+                                className="text-xs px-2 py-1 bg-red-500/20 text-red-700 rounded hover:bg-red-500/30 font-medium"
+                              >
+                                Marquer non payé
+                              </button>
+                            ) : (
+                              <button
+                                type="button" onClick={() => handleMarquerPaye(mois)}
+                                className="text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
+                              >
+                                Marquer payé
+                              </button>
+                            )}
                           </td>
                         </tr>
                       ))

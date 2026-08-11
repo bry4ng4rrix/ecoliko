@@ -20,6 +20,7 @@ import { DocumentsValidationPanel } from '@/components/documents/DocumentsValida
 import { AttendancePanel } from '@/components/presences/AttendancePanel'
 import { DisciplinePanel } from '@/components/discipline/DisciplinePanel'
 import { DemandesInscriptionPanel } from '@/components/inscriptions/DemandesInscriptionPanel'
+import { AnneesScolairesPanel } from '@/components/parametres/AnneesScolairesPanel'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -120,7 +121,7 @@ function SecretariatDashboard() {
           <p className="text-muted-foreground mt-1">Classes, matières et emplois du temps</p>
         </div>
         <div className="flex gap-2 border-b border-border">
-          {['classes', 'matieres', 'salles', 'emplois', 'calendrier'].map(tab => (
+          {['classes', 'matieres', 'salles', 'emplois', 'calendrier', 'annee-scolaire'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveSubTab(tab)}
@@ -133,6 +134,7 @@ function SecretariatDashboard() {
               {tab === 'salles' && 'Salles'}
               {tab === 'emplois' && 'Emplois du temps'}
               {tab === 'calendrier' && 'Vacances / Examens / Événements'}
+              {tab === 'annee-scolaire' && 'Année scolaire'}
             </button>
           ))}
         </div>
@@ -141,6 +143,7 @@ function SecretariatDashboard() {
         {activeSubTab === 'salles' && <SallesPanel />}
         {activeSubTab === 'emplois' && <EmploiDuTempsCalendar />}
         {activeSubTab === 'calendrier' && <EvenementsCalendrierPanel />}
+        {activeSubTab === 'annee-scolaire' && <AnneesScolairesPanel />}
       </div>
     )
   }

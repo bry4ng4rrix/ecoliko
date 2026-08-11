@@ -471,6 +471,14 @@ class Classe(models.Model):
         verbose_name=_('enseignants'),
         help_text=_("Enseignants intervenant dans cette classe (au-delà du seul professeur titulaire)."),
     )
+    frais_ecolage_mensuel = models.DecimalField(
+        _('écolage mensuel'), max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text=_("Montant de l'écolage par mois pour cette classe (ex: 100000 Ar/mois)."),
+    )
+    frais_inscription = models.DecimalField(
+        _("droit d'inscription/réinscription"), max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text=_("Frais d'inscription ou de réinscription pour cette classe."),
+    )
     est_active = models.BooleanField(_('est active'), default=True)
     date_creation = models.DateTimeField(_('date de création'), auto_now_add=True)
 

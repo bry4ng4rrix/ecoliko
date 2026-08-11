@@ -59,6 +59,34 @@ class DossierFinancierServiceTests(APITestCase):
         self.assertEqual(resultat['statut'], 'PAYE')
         self.assertEqual(resultat['reste_du'], Decimal('0'))
 
+    def test_classe_frais_ecolage_takes_priority_over_frais_scolarite(self):
+        """Si l'écolage est renseigné directement sur la classe, il prime sur le tarif niveau/filière."""
+        classe = f.make_classe(frais_ecolage_mensuel=Decimal('100000'), frais_inscription=Decimal('20000'))
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        FraisScolarite.objects.create(
+            annee_scolaire=classe.annee_scolaire, niveau=classe.niveau, filiere=classe.filiere,
+            montant_inscription=Decimal('999999'), montant_annuel=Decimal('999999'),
+        )
+
+        resultat = dossier_financier(etudiant, classe.annee_scolaire)
+
+        self.assertEqual(resultat['total_du'], Decimal('1220000'))  # 20000 + 100000*12
+        self.assertEqual(resultat['statut'], 'IMPAYE')
+
+    def test_falls_back_to_frais_scolarite_when_classe_has_no_tarif(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        FraisScolarite.objects.create(
+            annee_scolaire=classe.annee_scolaire, niveau=classe.niveau, filiere=classe.filiere,
+            montant_inscription=Decimal('50000'), montant_annuel=Decimal('500000'),
+        )
+
+        resultat = dossier_financier(etudiant, classe.annee_scolaire)
+
+        self.assertEqual(resultat['total_du'], Decimal('550000'))
+
     def test_en_attente_payments_dont_count_towards_paid(self):
         classe = f.make_classe()
         etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
