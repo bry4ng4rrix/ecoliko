@@ -357,6 +357,63 @@ class CarteEtudiantTests(APITestCase):
         response = self.client.get(f'/api/etudiants/{etudiant.id}/carte/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_admin_can_generate_certificat_scolarite(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        admin = f.make_user(role=User.Role.ADMIN, ecole=etudiant.ecole)
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(f'/api/etudiants/{etudiant.id}/certificat-scolarite/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertGreater(len(response.content), 0)
+
+        from application.models import DemandeDocument
+        demande = DemandeDocument.objects.get(etudiant=etudiant)
+        self.assertEqual(demande.statut, DemandeDocument.Statut.VALIDE)
+        self.assertEqual(demande.traite_par, admin)
+
+    def test_certificat_scolarite_sans_annee_active_renvoie_400(self):
+        etudiant = f.make_etudiant()
+        admin = f.make_user(role=User.Role.ADMIN, ecole=etudiant.ecole)
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post(f'/api/etudiants/{etudiant.id}/certificat-scolarite/')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_enseignant_cannot_generate_certificat_scolarite(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=etudiant.ecole)
+        self.client.force_authenticate(user=prof)
+
+        response = self.client.post(f'/api/etudiants/{etudiant.id}/certificat-scolarite/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_generate_carte_ecolage(self):
+        classe = f.make_classe(frais_ecolage_mensuel=100000, frais_inscription=50000)
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        admin = f.make_user(role=User.Role.ADMIN, ecole=etudiant.ecole)
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.get(f'/api/etudiants/{etudiant.id}/carte-ecolage/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertGreater(len(response.content), 0)
+
+    def test_enseignant_cannot_generate_carte_ecolage(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=etudiant.ecole)
+        self.client.force_authenticate(user=prof)
+
+        response = self.client.get(f'/api/etudiants/{etudiant.id}/carte-ecolage/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
 
 class SallePermissionTests(APITestCase):
     def test_secretariat_can_create_salle_without_annee_scolaire(self):
