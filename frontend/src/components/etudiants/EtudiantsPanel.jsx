@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Trash2, QrCode, Barcode, FileText, Upload, X, Edit2, CreditCard, Wallet, ArrowRightLeft } from 'lucide-react'
+import {
+  Plus, Trash2, QrCode, Barcode, FileText, Upload, X, Edit2, CreditCard, Wallet, ArrowRightLeft,
+  FileCheck, Receipt,
+} from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAnneeActive } from '@/hooks/useAnneeActive'
@@ -8,8 +11,9 @@ import {
   useCreateResource, useDeleteResource, useResourceList, useUpdateResource,
 } from '@/hooks/useResource'
 import {
-  classeService, documentEtudiantService, etudiantService, fetchDossierFinancier, fetchEtudiantCodeBarreUrl,
-  fetchEtudiantQrCodeUrl, fraisScolariteService, inscriptionService, paiementService, telechargerCarteEtudiant,
+  anneeScolaireService, classeService, documentEtudiantService, etudiantService, fetchDossierFinancier,
+  fetchEtudiantCodeBarreUrl, fetchEtudiantQrCodeUrl, fraisScolariteService, genererCertificatScolarite,
+  inscriptionService, paiementService, telechargerCarteEcolage, telechargerCarteEtudiant,
 } from '@/services'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -378,6 +382,7 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const { data: fraisScolarite } = useResourceList('frais-scolarite', fraisScolariteService)
   const { data: classes } = useResourceList('classes', classeService)
   const { data: inscriptions } = useResourceList('inscriptions', inscriptionService)
+  const { data: anneesScolaires } = useResourceList('annees-scolaires', anneeScolaireService)
   const createPaiement = useCreateResource('paiements', paiementService)
   const updatePaiement = useUpdateResource('paiements', paiementService)
 
@@ -398,9 +403,20 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
       )
     : null
 
+  // Élève déjà inscrit une année précédente => droit de réinscription plutôt qu'inscription
+  // (voir `services.finance.est_reinscription` côté backend — même logique de priorité ici).
+  const estReinscription = Boolean(anneeActive) && (inscriptions ?? []).some((i) => {
+    if (i.etudiant !== etudiant.id) return false
+    const anneeDeLInscription = (anneesScolaires ?? []).find((a) => a.id === i.annee_scolaire)
+    return anneeDeLInscription && anneeDeLInscription.date_debut < anneeActive.date_debut
+  })
+
   // Le tarif renseigné directement sur la classe prime sur celui par niveau/filière (voir
   // `services.finance.frais_attendus` côté backend — même logique de priorité ici).
-  const montantInscription = classeActuelle?.frais_inscription ?? tarifNiveau?.montant_inscription ?? null
+  const droitClasse = estReinscription && classeActuelle?.frais_reinscription != null
+    ? classeActuelle.frais_reinscription
+    : classeActuelle?.frais_inscription
+  const montantInscription = droitClasse ?? tarifNiveau?.montant_inscription ?? null
   const montantEcolageMensuel = classeActuelle?.frais_ecolage_mensuel
     ?? (tarifNiveau ? Number(tarifNiveau.montant_annuel) / 12 : null)
 
@@ -419,6 +435,14 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     const annee = mois >= 9 ? anneeDebut : anneeDebut + 1
     return `${annee}-${String(mois).padStart(2, '0')}-05`
   }
+
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const moisEnRetard = anneeActive
+    ? Array.from({ length: 12 }, (_, i) => i + 1).filter((mois) => {
+        const dejaPaye = paiementsParMois(mois).some((p) => p.statut === 'PAYE')
+        return !dejaPaye && dateEcheancePourMois(mois) < aujourdhui
+      }).length
+    : 0
 
   const invaliderFinance = () => {
     queryClient.invalidateQueries({ queryKey: ['paiements'] })
@@ -457,12 +481,25 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     }
   }
 
+  const handleGenererCarteEcolage = async () => {
+    try {
+      await telechargerCarteEcolage(etudiant.id, `carte_ecolage_${etudiant.matricule}.pdf`)
+    } catch (err) {
+      const data = err.response?.data
+      toast.error(data?.detail ?? 'Erreur lors de la génération de la carte.')
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto max-w-2xl">
         <DialogHeader>
           <DialogTitle>Paiements — {etudiant.prenom} {etudiant.nom}</DialogTitle>
         </DialogHeader>
+
+        <Button type="button" size="sm" className="gap-2 w-fit" onClick={handleGenererCarteEcolage}>
+          <Receipt className="w-4 h-4" /> Générer la carte d'écolage
+        </Button>
 
         {!anneeActive ? (
           <p className="text-sm text-muted-foreground">Aucune année scolaire active.</p>
@@ -471,7 +508,7 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
             {(loadingDossier || loadingPaiements) && <p className="text-sm text-muted-foreground">Chargement...</p>}
 
             {dossier && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div className="bg-muted rounded-lg p-3">
                   <p className="text-xs text-muted-foreground">Total dû</p>
                   <p className="text-lg font-bold">{Number(dossier.total_du).toLocaleString('fr-FR')} Ar</p>
@@ -490,6 +527,10 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                     {dossier.statut}
                   </Badge>
                 </div>
+                <div className="bg-muted rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">Mois en retard</p>
+                  <p className={`text-lg font-bold ${moisEnRetard > 0 ? 'text-red-600' : ''}`}>{moisEnRetard}</p>
+                </div>
               </div>
             )}
 
@@ -500,7 +541,7 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
               ) : (
                 <div className="flex flex-wrap gap-3">
                   <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
-                    <span className="text-sm">Droit d'inscription / réinscription</span>
+                    <span className="text-sm">{estReinscription ? 'Droit de réinscription' : "Droit d'inscription"}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono">
                         {montantInscription != null ? `${Number(montantInscription).toLocaleString('fr-FR')} Ar` : '—'}
@@ -539,11 +580,20 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                       const lignes = paiementsParMois(mois)
                       const dejaPaye = lignes.some((p) => p.statut === 'PAYE')
                       if (lignes.length === 0) {
+                        const echeance = dateEcheancePourMois(mois)
+                        const enRetard = echeance < new Date().toISOString().slice(0, 10)
                         return (
                           <tr key={mois}>
                             <td className="px-3 py-2">{label}</td>
-                            <td className="px-3 py-2 text-muted-foreground" colSpan={2}>—</td>
-                            <td className="px-3 py-2"><Badge variant="secondary">Non payé</Badge></td>
+                            <td className="px-3 py-2 text-muted-foreground">—</td>
+                            <td className="px-3 py-2 text-muted-foreground">
+                              Échéance : {new Date(echeance).toLocaleDateString('fr-FR')}
+                            </td>
+                            <td className="px-3 py-2">
+                              <Badge variant={enRetard ? 'destructive' : 'secondary'}>
+                                {enRetard ? 'En retard' : 'Non payé'}
+                              </Badge>
+                            </td>
                             <td className="px-3 py-2 text-center">
                               <button
                                 type="button" onClick={() => handleMarquerPaye(mois)}
@@ -644,6 +694,16 @@ function DossierEtudiantDialog({ etudiant, onClose }) {
     }
   }
 
+  const handleGenererCertificat = async () => {
+    try {
+      await genererCertificatScolarite(etudiant.id, `certificat_scolarite_${etudiant.matricule}.pdf`)
+      toast.success('Certificat de scolarité généré.')
+    } catch (err) {
+      const data = err.response?.data
+      toast.error(data?.detail ?? 'Erreur lors de la génération du certificat.')
+    }
+  }
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[85vh] overflow-y-auto max-w-2xl">
@@ -661,6 +721,9 @@ function DossierEtudiantDialog({ etudiant, onClose }) {
             </Button>
             <Button type="button" size="sm" className="gap-2" onClick={handleGenererCarte}>
               <CreditCard className="w-4 h-4" /> Générer la carte d'étudiant
+            </Button>
+            <Button type="button" size="sm" className="gap-2" onClick={handleGenererCertificat}>
+              <FileCheck className="w-4 h-4" /> Générer un certificat de scolarité
             </Button>
           </div>
           {qrUrl && <img src={qrUrl} alt="QR code étudiant" className="w-32 h-32 border border-border rounded-lg" />}

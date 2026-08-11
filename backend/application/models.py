@@ -476,8 +476,12 @@ class Classe(models.Model):
         help_text=_("Montant de l'écolage par mois pour cette classe (ex: 100000 Ar/mois)."),
     )
     frais_inscription = models.DecimalField(
-        _("droit d'inscription/réinscription"), max_digits=10, decimal_places=2, null=True, blank=True,
-        help_text=_("Frais d'inscription ou de réinscription pour cette classe."),
+        _("droit d'inscription"), max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text=_("Frais d'inscription pour un nouvel élève dans cette classe."),
+    )
+    frais_reinscription = models.DecimalField(
+        _('droit de réinscription'), max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text=_("Frais de réinscription pour un élève déjà inscrit l'année précédente."),
     )
     est_active = models.BooleanField(_('est active'), default=True)
     date_creation = models.DateTimeField(_('date de création'), auto_now_add=True)
@@ -1566,6 +1570,59 @@ class DossierEnseignant(models.Model):
 
     def __str__(self):
         return f"Dossier RH - {self.enseignant.get_full_name()}"
+
+
+class PaiementSalaire(models.Model):
+    """Paiement du salaire mensuel d'un enseignant.
+
+    Miroir de `PaiementEcolage` côté personnel : une carte de paiement par mois, avec
+    statut et mode de paiement, pour le suivi de la paie de l'établissement.
+    """
+
+    class StatutPaiement(models.TextChoices):
+        EN_ATTENTE = 'EN_ATTENTE', _('En attente')
+        PAYE = 'PAYE', _('Payé')
+        ANNULE = 'ANNULE', _('Annulé')
+
+    membre = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='paiements_salaire',
+        limit_choices_to={'role': User.Role.ENSEIGNANT}, verbose_name=_('enseignant'),
+    )
+    annee_scolaire = models.ForeignKey(
+        AnneeScolaire, on_delete=models.CASCADE, related_name='paiements_salaire', verbose_name=_('année scolaire')
+    )
+    montant = models.DecimalField(_('montant'), max_digits=10, decimal_places=2)
+    mois_couvert = models.PositiveSmallIntegerField(
+        _('mois couvert'), validators=[MinValueValidator(1), MaxValueValidator(12)]
+    )
+    date_paiement = models.DateField(_('date de paiement'), default=timezone.localdate)
+    mode_paiement = models.CharField(
+        _('mode de paiement'), max_length=50, default='Espèces',
+        help_text=_('Ex: Espèces, Virement, Chèque, Mobile Money...'),
+    )
+    statut = models.CharField(
+        _('statut'), max_length=15, choices=StatutPaiement.choices, default=StatutPaiement.EN_ATTENTE
+    )
+    reference = models.CharField(_('référence'), max_length=50, blank=True, null=True)
+    commentaire = models.TextField(_('commentaire'), blank=True, null=True)
+    cree_par = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='paiements_salaire_crees',
+        verbose_name=_('créé par'),
+    )
+    date_creation = models.DateTimeField(_('date de création'), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('paiement de salaire')
+        verbose_name_plural = _('paiements de salaire')
+        ordering = ['-annee_scolaire__date_debut', 'mois_couvert']
+        unique_together = ['membre', 'annee_scolaire', 'mois_couvert']
+
+    def __str__(self):
+        return f"{self.membre.get_full_name()} - {self.mois_couvert}/{self.annee_scolaire.libelle} - {self.montant}"
+
+    def clean(self):
+        if self.membre_id and self.annee_scolaire_id and self.membre.ecole_id != self.annee_scolaire.ecole_id:
+            raise ValidationError(_("Le membre du personnel et l'année scolaire doivent appartenir au même établissement."))
 
 
 class EvenementCalendrier(models.Model):

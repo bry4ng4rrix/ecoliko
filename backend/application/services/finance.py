@@ -10,20 +10,39 @@ from django.db.models import Sum
 from ..models import Etudiant, AnneeScolaire, FraisScolarite, PaiementEcolage
 
 
+def est_reinscription(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> bool:
+    """Vrai si l'étudiant était déjà inscrit dans cet établissement une année précédente
+
+    (donc redevable du droit de réinscription plutôt que du droit d'inscription initial).
+    """
+    return etudiant.inscriptions.filter(annee_scolaire__date_debut__lt=annee_scolaire.date_debut).exists()
+
+
 def frais_attendus(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> Decimal:
-    """Montant total dû (inscription + écolage annuel) pour cet étudiant sur cette année.
+    """Montant total dû (droit d'inscription/réinscription + écolage annuel) pour cet étudiant.
 
     Priorité au tarif renseigné directement sur la classe (`Classe.frais_ecolage_mensuel` /
-    `frais_inscription`) ; à défaut, tarif configuré par niveau/filière (`FraisScolarite`,
-    pour compatibilité avec les établissements déjà configurés ainsi). 0 si rien n'est renseigné.
+    `frais_inscription` / `frais_reinscription` — ce dernier ne s'applique que si l'étudiant
+    était déjà inscrit l'année précédente) ; à défaut, tarif configuré par niveau/filière
+    (`FraisScolarite`, pour compatibilité avec les établissements déjà configurés ainsi).
+    0 si rien n'est renseigné.
     """
     inscription = etudiant.inscriptions.filter(annee_scolaire=annee_scolaire).select_related('classe').first()
     if inscription is None:
         return Decimal('0')
     classe = inscription.classe
 
-    if classe.frais_ecolage_mensuel is not None or classe.frais_inscription is not None:
-        return (classe.frais_inscription or Decimal('0')) + (classe.frais_ecolage_mensuel or Decimal('0')) * 12
+    tarif_classe_renseigne = (
+        classe.frais_ecolage_mensuel is not None
+        or classe.frais_inscription is not None
+        or classe.frais_reinscription is not None
+    )
+    if tarif_classe_renseigne:
+        if est_reinscription(etudiant, annee_scolaire) and classe.frais_reinscription is not None:
+            droit = classe.frais_reinscription
+        else:
+            droit = classe.frais_inscription or Decimal('0')
+        return droit + (classe.frais_ecolage_mensuel or Decimal('0')) * 12
 
     tarif = FraisScolarite.objects.filter(
         annee_scolaire=annee_scolaire, niveau=classe.niveau, filiere=classe.filiere

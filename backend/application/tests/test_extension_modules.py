@@ -171,6 +171,69 @@ class DossierEnseignantTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class PaiementSalaireTests(APITestCase):
+    def test_admin_can_create_paiement_salaire(self):
+        annee = f.make_annee_scolaire()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        admin = f.make_user(role=User.Role.ADMIN, ecole=annee.ecole)
+        self.client.force_authenticate(user=admin)
+
+        response = self.client.post('/api/paiements-salaire/', {
+            'membre': prof.id, 'annee_scolaire': annee.id, 'montant': '800000',
+            'mois_couvert': 9, 'mode_paiement': 'Virement', 'statut': 'PAYE',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['membre_nom'], prof.get_full_name())
+
+    def test_duplicate_month_for_same_teacher_rejected(self):
+        annee = f.make_annee_scolaire()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        admin = f.make_user(role=User.Role.ADMIN, ecole=annee.ecole)
+        self.client.force_authenticate(user=admin)
+
+        payload = {'membre': prof.id, 'annee_scolaire': annee.id, 'montant': '800000', 'mois_couvert': 9}
+        first = self.client.post('/api/paiements-salaire/', payload)
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED, first.data)
+
+        second = self.client.post('/api/paiements-salaire/', payload)
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_teacher_sees_only_his_own_paiements(self):
+        annee = f.make_annee_scolaire()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        autre_prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        from application.models import PaiementSalaire
+        PaiementSalaire.objects.create(membre=prof, annee_scolaire=annee, montant=800000, mois_couvert=9)
+        PaiementSalaire.objects.create(membre=autre_prof, annee_scolaire=annee, montant=750000, mois_couvert=9)
+
+        self.client.force_authenticate(user=prof)
+        response = self.client.get('/api/paiements-salaire/')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['membre'], prof.id)
+
+    def test_teacher_cannot_write_paiement_salaire(self):
+        annee = f.make_annee_scolaire()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        self.client.force_authenticate(user=prof)
+
+        response = self.client.post('/api/paiements-salaire/', {
+            'membre': prof.id, 'annee_scolaire': annee.id, 'montant': '800000', 'mois_couvert': 9,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_secretariat_cannot_write_paiement_salaire(self):
+        """Contrairement à l'écolage étudiant, le salaire est réservé à l'admin (donnée plus sensible)."""
+        annee = f.make_annee_scolaire()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        secretaire = f.make_user(role=User.Role.SECRETARIAT, ecole=annee.ecole)
+        self.client.force_authenticate(user=secretaire)
+
+        response = self.client.post('/api/paiements-salaire/', {
+            'membre': prof.id, 'annee_scolaire': annee.id, 'montant': '800000', 'mois_couvert': 9,
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
 class EmploiDuTempsConflictTests(APITestCase):
     def test_same_teacher_overlapping_slot_rejected(self):
         classe = f.make_classe()

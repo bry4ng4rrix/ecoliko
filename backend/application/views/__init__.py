@@ -16,7 +16,7 @@ from .communication import AnnonceViewSet, MessageViewSet, NotificationViewSet
 from .audit import AuditLogViewSet
 from .statistiques import StatistiquesView
 from .discipline import EvenementDisciplinaireViewSet
-from .rh import DossierEnseignantViewSet
+from .rh import DossierEnseignantViewSet, PaiementSalaireViewSet
 from .calendrier import EvenementCalendrierViewSet
 from .documents_etudiant import DocumentJustificatifEtudiantViewSet
 from .demandes_inscription import PieceJointeInscriptionViewSet
@@ -34,5 +34,5 @@ __all__ = [
     'AnnonceViewSet', 'MessageViewSet', 'NotificationViewSet',
     'AuditLogViewSet', 'StatistiquesView', 'EvenementDisciplinaireViewSet',
     'DossierEnseignantViewSet', 'EvenementCalendrierViewSet', 'DocumentJustificatifEtudiantViewSet',
-    'PieceJointeInscriptionViewSet',
+    'PieceJointeInscriptionViewSet', 'PaiementSalaireViewSet',
 ]

@@ -8,9 +8,9 @@ from .views import (
     DocumentJustificatifEtudiantViewSet, DossierEnseignantViewSet, EcoleViewSet, EmploiDuTempsViewSet,
     EtudiantViewSet, EvenementCalendrierViewSet, EvenementDisciplinaireViewSet, FiliereViewSet,
     FraisScolariteViewSet, InscriptionViewSet, MatiereViewSet, MessageViewSet, NiveauViewSet, NotificationViewSet,
-    NoteViewSet, PaiementEcolageViewSet, PieceJointeInscriptionViewSet, PresenceCoursViewSet, RegisterEcoleView,
-    RegisterView, SalleViewSet, StaffViewSet, StatistiquesView, TrimestreViewSet, TuteurEtudiantViewSet,
-    UserProfileView,
+    NoteViewSet, PaiementEcolageViewSet, PaiementSalaireViewSet, PieceJointeInscriptionViewSet,
+    PresenceCoursViewSet, RegisterEcoleView, RegisterView, SalleViewSet, StaffViewSet, StatistiquesView,
+    TrimestreViewSet, TuteurEtudiantViewSet, UserProfileView,
 )
 
 router = DefaultRouter()
@@ -36,6 +36,7 @@ router.register('emplois-du-temps', EmploiDuTempsViewSet, basename='emploidutemp
 router.register('cahier-textes', CahierTexteViewSet, basename='cahiertexte')
 router.register('discipline', EvenementDisciplinaireViewSet, basename='evenementdisciplinaire')
 router.register('dossiers-enseignants', DossierEnseignantViewSet, basename='dossierenseignant')
+router.register('paiements-salaire', PaiementSalaireViewSet, basename='paiementsalaire')
 router.register('evenements-calendrier', EvenementCalendrierViewSet, basename='evenementcalendrier')
 router.register('documents-etudiants', DocumentJustificatifEtudiantViewSet, basename='documentjustificatifetudiant')
 router.register('bulletins', BulletinViewSet, basename='bulletin')

@@ -27,6 +27,7 @@ export const auditLogService = createResourceService("/audit-logs")
 export const cahierTexteService = createResourceService("/cahier-textes")
 export const disciplineService = createResourceService("/discipline")
 export const dossierEnseignantService = createResourceService("/dossiers-enseignants")
+export const paiementSalaireService = createResourceService("/paiements-salaire")
 export const evenementCalendrierService = createResourceService("/evenements-calendrier")
 export const documentEtudiantService = createResourceService("/documents-etudiants")
 
@@ -45,6 +46,18 @@ export async function validerBulletin(bulletinId) {
 
 async function telechargerPdf(url, nomFichier) {
   const response = await apiClient.get(url, { responseType: 'blob' })
+  const objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = nomFichier
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(objectUrl)
+}
+
+async function telechargerPdfPost(url, nomFichier) {
+  const response = await apiClient.post(url, null, { responseType: 'blob' })
   const objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
   const link = document.createElement('a')
   link.href = objectUrl
@@ -132,6 +145,16 @@ export const fetchEtudiantCodeBarreUrl = (etudiantId) => fetchImageObjectUrl(`/e
 /** Télécharge la carte d'étudiant PDF (photo, matricule, QR code). */
 export async function telechargerCarteEtudiant(etudiantId, nomFichier = 'carte_etudiant.pdf') {
   return telechargerPdf(`/etudiants/${etudiantId}/carte/`, nomFichier)
+}
+
+/** Génère et télécharge un certificat de scolarité PDF (validé d'office par l'admin/bureau). */
+export async function genererCertificatScolarite(etudiantId, nomFichier = 'certificat_scolarite.pdf') {
+  return telechargerPdfPost(`/etudiants/${etudiantId}/certificat-scolarite/`, nomFichier)
+}
+
+/** Télécharge la carte d'écolage PDF (reçu récapitulatif des paiements pour l'année active). */
+export async function telechargerCarteEcolage(etudiantId, nomFichier = 'carte_ecolage.pdf') {
+  return telechargerPdf(`/etudiants/${etudiantId}/carte-ecolage/`, nomFichier)
 }
 
 /** Justification d'une absence/retard par l'étudiant concerné (ou son parent). */

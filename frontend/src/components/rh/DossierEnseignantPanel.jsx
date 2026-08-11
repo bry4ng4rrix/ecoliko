@@ -1,10 +1,16 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { useCreateResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
-import { dossierEnseignantService, staffService } from '@/services'
+import { useAnneeActive } from '@/hooks/useAnneeActive'
+import {
+  useCreateResource, useResourceList, useUpdateResource,
+} from '@/hooks/useResource'
+import { dossierEnseignantService, paiementSalaireService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const TYPE_CONTRAT_LABELS = { CDI: 'CDI', CDD: 'CDD', VACATAIRE: 'Vacataire', STAGIAIRE: 'Stagiaire' }
 
@@ -12,9 +18,19 @@ const EMPTY_FORM = {
   enseignant: '', type_contrat: 'CDI', date_embauche: '', diplomes: '', salaire: '', volume_horaire_hebdo: '',
 }
 
+const MOIS_LABELS = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+]
+
+const MODES_PAIEMENT = ['Espèces', 'Virement', 'Chèque', 'Mobile Money']
+
+const STATUT_VARIANT = { PAYE: 'default', EN_ATTENTE: 'secondary', ANNULE: 'secondary' }
+
 export function DossierEnseignantPanel() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [enseignantPaiements, setEnseignantPaiements] = useState(null)
 
   const { data: personnel } = useResourceList('personnel', staffService)
   const { data: dossiers, isLoading } = useResourceList('dossiers-enseignants', dossierEnseignantService)
@@ -138,9 +154,15 @@ export function DossierEnseignantPanel() {
                 <td className="px-4 py-3">{TYPE_CONTRAT_LABELS[d.type_contrat] ?? '—'}</td>
                 <td className="px-4 py-3">{d.date_embauche ?? '—'}</td>
                 <td className="px-4 py-3">{d.volume_horaire_hebdo ? `${d.volume_horaire_hebdo} h/sem` : '—'}</td>
-                <td className="px-4 py-3 text-center">
+                <td className="px-4 py-3 text-center space-x-3">
                   <button className="text-primary hover:underline text-xs" onClick={() => startEdit(d.enseignant)}>
                     Modifier
+                  </button>
+                  <button
+                    className="text-primary hover:underline text-xs"
+                    onClick={() => setEnseignantPaiements({ id: d.enseignant, nom: d.enseignant_nom, salaire: d.salaire })}
+                  >
+                    Paiements
                   </button>
                 </td>
               </tr>
@@ -148,6 +170,149 @@ export function DossierEnseignantPanel() {
           </tbody>
         </table>
       </div>
+
+      {enseignantPaiements && (
+        <PaiementsSalaireDialog enseignant={enseignantPaiements} onClose={() => setEnseignantPaiements(null)} />
+      )}
     </div>
+  )
+}
+
+function PaiementsSalaireDialog({ enseignant, onClose }) {
+  const anneeActive = useAnneeActive()
+  const queryClient = useQueryClient()
+  const { data: paiements, isLoading } = useResourceList('paiements-salaire', paiementSalaireService)
+  const createPaiement = useCreateResource('paiements-salaire', paiementSalaireService)
+  const updatePaiement = useUpdateResource('paiements-salaire', paiementSalaireService)
+
+  const mesPaiements = (paiements ?? []).filter(
+    (p) => p.membre === enseignant.id && p.annee_scolaire === anneeActive?.id
+  )
+  const paiementsParMois = (mois) => mesPaiements.filter((p) => p.mois_couvert === mois)
+
+  const dateEcheancePourMois = (mois) => {
+    const anneeDebut = new Date(anneeActive.date_debut).getFullYear()
+    const annee = mois >= 9 ? anneeDebut : anneeDebut + 1
+    return `${annee}-${String(mois).padStart(2, '0')}-05`
+  }
+
+  const invalider = () => queryClient.invalidateQueries({ queryKey: ['paiements-salaire'] })
+
+  const handleMarquerPaye = async (mois, modePaiement) => {
+    const existant = paiementsParMois(mois)[0]
+    try {
+      if (existant) {
+        await updatePaiement.mutateAsync({ id: existant.id, payload: { statut: 'PAYE', mode_paiement: modePaiement } })
+      } else {
+        await createPaiement.mutateAsync({
+          membre: enseignant.id, annee_scolaire: anneeActive.id, montant: enseignant.salaire ?? 0,
+          mois_couvert: mois, date_paiement: dateEcheancePourMois(mois), mode_paiement: modePaiement, statut: 'PAYE',
+        })
+      }
+      invalider()
+      toast.success('Mois marqué comme payé.')
+    } catch (err) {
+      const data = err.response?.data
+      toast.error(data ? Object.values(data).flat().join(' ') : 'Erreur lors de la mise à jour.')
+    }
+  }
+
+  const handleMarquerNonPaye = async (mois) => {
+    const existant = paiementsParMois(mois)[0]
+    if (!existant) return
+    try {
+      await updatePaiement.mutateAsync({ id: existant.id, payload: { statut: 'EN_ATTENTE' } })
+      invalider()
+      toast.success('Mois marqué comme non payé.')
+    } catch {
+      toast.error('Erreur lors de la mise à jour.')
+    }
+  }
+
+  const totalPaye = mesPaiements.filter((p) => p.statut === 'PAYE').reduce((s, p) => s + Number(p.montant), 0)
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Paiements de salaire — {enseignant.nom}</DialogTitle>
+        </DialogHeader>
+
+        {!anneeActive ? (
+          <p className="text-sm text-muted-foreground">Aucune année scolaire active.</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-muted rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">Salaire mensuel</p>
+                <p className="text-lg font-bold">
+                  {enseignant.salaire ? `${Number(enseignant.salaire).toLocaleString('fr-FR')} Ar` : 'Non renseigné'}
+                </p>
+              </div>
+              <div className="bg-muted rounded-lg p-3">
+                <p className="text-xs text-muted-foreground">Total versé cette année</p>
+                <p className="text-lg font-bold text-green-600">{totalPaye.toLocaleString('fr-FR')} Ar</p>
+              </div>
+            </div>
+
+            {isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Mois</th>
+                    <th className="px-3 py-2 text-left">Montant</th>
+                    <th className="px-3 py-2 text-left">Mode</th>
+                    <th className="px-3 py-2 text-left">Statut</th>
+                    <th className="px-3 py-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {MOIS_LABELS.map((label, i) => {
+                    const mois = i + 1
+                    const paiement = paiementsParMois(mois)[0]
+                    const dejaPaye = paiement?.statut === 'PAYE'
+                    return (
+                      <tr key={mois}>
+                        <td className="px-3 py-2">{label}</td>
+                        <td className="px-3 py-2 font-mono">
+                          {paiement ? `${Number(paiement.montant).toLocaleString('fr-FR')} Ar` : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">{paiement?.mode_paiement ?? '—'}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant={paiement ? (STATUT_VARIANT[paiement.statut] ?? 'secondary') : 'secondary'}>
+                            {paiement ? paiement.statut : 'Non payé'}
+                          </Badge>
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {dejaPaye ? (
+                            <button
+                              type="button" onClick={() => handleMarquerNonPaye(mois)}
+                              className="text-xs px-2 py-1 bg-red-500/20 text-red-700 rounded hover:bg-red-500/30 font-medium"
+                            >
+                              Marquer non payé
+                            </button>
+                          ) : (
+                            <select
+                              defaultValue=""
+                              onChange={(e) => { if (e.target.value) handleMarquerPaye(mois, e.target.value) }}
+                              className="text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded font-medium border-0 cursor-pointer"
+                            >
+                              <option value="" disabled>Marquer payé...</option>
+                              {MODES_PAIEMENT.map((mode) => <option key={mode} value={mode}>{mode}</option>)}
+                            </select>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }

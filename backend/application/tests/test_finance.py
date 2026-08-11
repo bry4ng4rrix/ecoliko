@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 from rest_framework import status
@@ -73,6 +74,36 @@ class DossierFinancierServiceTests(APITestCase):
 
         self.assertEqual(resultat['total_du'], Decimal('1220000'))  # 20000 + 100000*12
         self.assertEqual(resultat['statut'], 'IMPAYE')
+
+    def test_nouvel_eleve_paie_frais_inscription_pas_reinscription(self):
+        classe = f.make_classe(frais_ecolage_mensuel=Decimal('50000'), frais_inscription=Decimal('20000'),
+                                frais_reinscription=Decimal('5000'))
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)  # première inscription, jamais inscrit avant
+
+        resultat = dossier_financier(etudiant, classe.annee_scolaire)
+
+        self.assertEqual(resultat['total_du'], Decimal('620000'))  # 20000 (inscription) + 50000*12
+
+    def test_eleve_deja_inscrit_paie_frais_reinscription(self):
+        ecole = f.make_ecole()
+        annee_precedente = f.make_annee_scolaire(
+            ecole=ecole, date_debut=date(2024, 9, 1), date_fin=date(2025, 6, 30), est_active=False,
+        )
+        classe_precedente = f.make_classe(annee_scolaire=annee_precedente)
+        etudiant = f.make_etudiant(ecole=ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe_precedente, annee_scolaire=annee_precedente)
+
+        annee_courante = f.make_annee_scolaire(ecole=ecole, date_debut=date(2025, 9, 1), date_fin=date(2026, 6, 30))
+        classe_courante = f.make_classe(
+            annee_scolaire=annee_courante, frais_ecolage_mensuel=Decimal('50000'),
+            frais_inscription=Decimal('20000'), frais_reinscription=Decimal('5000'),
+        )
+        f.make_inscription(etudiant=etudiant, classe=classe_courante, annee_scolaire=annee_courante)
+
+        resultat = dossier_financier(etudiant, annee_courante)
+
+        self.assertEqual(resultat['total_du'], Decimal('605000'))  # 5000 (réinscription) + 50000*12
 
     def test_falls_back_to_frais_scolarite_when_classe_has_no_tarif(self):
         classe = f.make_classe()

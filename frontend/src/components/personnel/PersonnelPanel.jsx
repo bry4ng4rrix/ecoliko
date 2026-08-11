@@ -3,7 +3,7 @@ import { Plus, Trash2, Edit2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useCreateResource, useDeleteResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
-import { classeService, matiereService, staffService } from '@/services'
+import { classeService, dossierEnseignantService, matiereService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 
@@ -34,16 +34,20 @@ export function PersonnelPanel({ roleFilter, title }) {
   const [matieresChoisies, setMatieresChoisies] = useState([])
   const [classesChoisies, setClassesChoisies] = useState([])
   const [classeTitulaire, setClasseTitulaire] = useState('')
+  const [salaire, setSalaire] = useState('')
 
   const { data: personnel, isLoading } = useResourceList('personnel', staffService)
   const creeUnEnseignant = roleFilter === 'ENSEIGNANT' || (!roleFilter && form.role === 'ENSEIGNANT')
   const { data: matieres } = useResourceList('matieres', matiereService, { enabled: creeUnEnseignant })
   const { data: classes } = useResourceList('classes', classeService, { enabled: creeUnEnseignant })
+  const { data: dossiersRH } = useResourceList('dossiers-enseignants', dossierEnseignantService, { enabled: creeUnEnseignant })
   const createStaff = useCreateResource('personnel', staffService)
   const updateStaff = useUpdateResource('personnel', staffService)
   const deleteStaff = useDeleteResource('personnel', staffService)
   const updateMatiere = useUpdateResource('matieres', matiereService)
   const updateClasse = useUpdateResource('classes', classeService)
+  const createDossierRH = useCreateResource('dossiers-enseignants', dossierEnseignantService)
+  const updateDossierRH = useUpdateResource('dossiers-enseignants', dossierEnseignantService)
 
   const liste = roleFilter ? (personnel ?? []).filter((p) => p.role === roleFilter) : (personnel ?? [])
 
@@ -60,12 +64,14 @@ export function PersonnelPanel({ roleFilter, title }) {
   const matieresDe = (enseignantId) => (matieres ?? []).filter((m) => m.enseignant === enseignantId)
   const classeDe = (enseignantId) => (classes ?? []).find((c) => c.titulaire === enseignantId)
   const classesEnseigneesDe = (enseignantId) => (classes ?? []).filter((c) => (c.enseignants ?? []).includes(enseignantId))
+  const dossierRHDe = (enseignantId) => (dossiersRH ?? []).find((d) => d.enseignant === enseignantId)
 
   const resetForm = () => {
     setForm(emptyForm(roleFilter ?? 'ENSEIGNANT'))
     setMatieresChoisies([])
     setClassesChoisies([])
     setClasseTitulaire('')
+    setSalaire('')
     setEditing(null)
     setShowForm(false)
   }
@@ -79,6 +85,7 @@ export function PersonnelPanel({ roleFilter, title }) {
     setMatieresChoisies(matieresDe(p.id).map((m) => m.id))
     setClassesChoisies(classesEnseigneesDe(p.id).map((c) => c.id))
     setClasseTitulaire(classeDe(p.id)?.id ? String(classeDe(p.id).id) : '')
+    setSalaire(dossierRHDe(p.id)?.salaire ?? '')
     setShowForm(true)
   }
 
@@ -121,13 +128,28 @@ export function PersonnelPanel({ roleFilter, title }) {
     }
   }
 
+  const appliquerSalaire = async (enseignantId) => {
+    if (salaire === '') return
+    const dossierExistant = dossierRHDe(enseignantId)
+    if (dossierExistant) {
+      if (Number(dossierExistant.salaire) !== Number(salaire)) {
+        await updateDossierRH.mutateAsync({ id: dossierExistant.id, payload: { salaire: Number(salaire) } })
+      }
+    } else {
+      await createDossierRH.mutateAsync({ enseignant: enseignantId, salaire: Number(salaire) })
+    }
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
       if (editing) {
         const { matricule, ...editable } = form
         const enseignant = await updateStaff.mutateAsync({ id: editing.id, payload: editable })
-        if (creeUnEnseignant) await appliquerAffectationsEnseignant(enseignant.id)
+        if (creeUnEnseignant) {
+          await appliquerAffectationsEnseignant(enseignant.id)
+          await appliquerSalaire(enseignant.id)
+        }
         toast.success('Compte mis à jour.')
       } else {
         const enseignant = await createStaff.mutateAsync(form)
@@ -146,6 +168,7 @@ export function PersonnelPanel({ roleFilter, title }) {
           if (classeTitulaire) {
             await updateClasse.mutateAsync({ id: Number(classeTitulaire), payload: { titulaire: enseignant.id } })
           }
+          await appliquerSalaire(enseignant.id)
         }
         const identifiant = enseignant.matricule || enseignant.email
         toast.success(`Compte créé. Identifiant : ${identifiant} — mot de passe temporaire : ${MOT_DE_PASSE_TEMPORAIRE}`)
@@ -329,6 +352,14 @@ export function PersonnelPanel({ roleFilter, title }) {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-2 pt-2">Salaire (Ar/mois)</p>
+                <input
+                  type="number" min="0" step="0.01" value={salaire} onChange={(e) => setSalaire(e.target.value)}
+                  placeholder="Ex: 800000"
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                />
               </div>
             </div>
           )}

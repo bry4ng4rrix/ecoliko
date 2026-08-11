@@ -4,7 +4,7 @@ from .auth import (
 )
 from .audit import AuditLogSerializer
 from .discipline import EvenementDisciplinaireSerializer
-from .rh import DossierEnseignantSerializer
+from .rh import DossierEnseignantSerializer, PaiementSalaireSerializer
 from .calendrier import EvenementCalendrierSerializer
 from .documents_etudiant import DocumentJustificatifEtudiantSerializer
 from .demandes_inscription import DemandeInscriptionSuiviSerializer, PieceJointeInscriptionSerializer
@@ -34,5 +34,5 @@ __all__ = [
     'EmploiDuTempsSerializer', 'BulletinSerializer', 'GenererBulletinSerializer',
     'DemandeDocumentSerializer', 'RefuserDemandeSerializer',
     'DemandeInscriptionSuiviSerializer', 'PieceJointeInscriptionSerializer', 'DocumentJustificatifEtudiantSerializer',
-    'AnnonceSerializer', 'MessageSerializer', 'NotificationSerializer',
+    'AnnonceSerializer', 'MessageSerializer', 'NotificationSerializer', 'PaiementSalaireSerializer',
 ]
