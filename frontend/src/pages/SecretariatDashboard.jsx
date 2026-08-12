@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LogOut, Home, Users, BookOpen, Clock, Database, MessageSquare, Menu, X, UserPlus } from 'lucide-react'
+import { LogOut, Home, Users, BookOpen, Clock, Database, MessageSquare, Menu, X, UserPlus, Settings } from 'lucide-react'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useResourceList } from '@/hooks/useResource'
 import { demandeDocumentService, etudiantService } from '@/services'
 import { NotificationBell } from '@/components/NotificationBell'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
 import { ClassesPanel } from '@/components/academique/ClassesPanel'
@@ -21,6 +22,7 @@ import { AttendancePanel } from '@/components/presences/AttendancePanel'
 import { DisciplinePanel } from '@/components/discipline/DisciplinePanel'
 import { DemandesInscriptionPanel } from '@/components/inscriptions/DemandesInscriptionPanel'
 import { AnneesScolairesPanel } from '@/components/parametres/AnneesScolairesPanel'
+import { MonProfilPanel } from '@/components/parametres/MonProfilPanel'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -44,6 +46,7 @@ function SecretariatDashboard() {
     { id: 'presence', label: 'Présence & Absences', icon: Clock },
     { id: 'administratif', label: 'Paiements & Documents', icon: Database },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
+    { id: 'parametres', label: 'Paramètres', icon: Settings },
   ]
 
   const handleLogout = () => {
@@ -236,6 +239,19 @@ function SecretariatDashboard() {
     )
   }
 
+  const SecretariatSettings = () => (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Paramètres</h1>
+        <p className="text-muted-foreground mt-1">Gestion de votre profil</p>
+      </div>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-bold mb-6">Mon profil</h2>
+        <MonProfilPanel />
+      </div>
+    </div>
+  )
+
   return (
     <div className="h-screen flex overflow-hidden bg-background text-foreground">
       {/* Sidebar */}
@@ -284,6 +300,7 @@ function SecretariatDashboard() {
             <p className="text-xs text-muted-foreground">Bureau administratif • Secrétariat</p>
           </div>
           <div className="flex items-center gap-3">
+            <UserAvatar photo={user?.photo} name={user ? `${user.first_name} ${user.last_name}` : ''} className="w-9 h-9" />
             <NotificationBell />
           </div>
         </header>
@@ -295,6 +312,7 @@ function SecretariatDashboard() {
           {activeTab === 'presence' && <AttendanceAbsence />}
           {activeTab === 'administratif' && <AdministrativeManagement />}
           {activeTab === 'communication' && <Communication />}
+          {activeTab === 'parametres' && <SecretariatSettings />}
         </main>
       </div>
     </div>

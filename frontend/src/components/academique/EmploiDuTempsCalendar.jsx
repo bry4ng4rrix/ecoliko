@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useCreateResource, useDeleteResource, useResourceList } from '@/hooks/useResource'
 import { classeService, emploiDuTempsService, matiereService, salleService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const JOURS = [
   { code: 'LUN', label: 'Lundi' }, { code: 'MAR', label: 'Mardi' }, { code: 'MER', label: 'Mercredi' },
@@ -180,7 +181,12 @@ export function EmploiDuTempsCalendar() {
                               </button>
                               <p className="font-semibold">{slot.matiere_intitule}</p>
                               {slot.groupe && <p className="font-medium">{slot.groupe}</p>}
-                              {slot.enseignant_nom && <p className="text-muted-foreground">{slot.enseignant_nom}</p>}
+                              {slot.enseignant_nom && (
+                                <div className="flex items-center gap-1.5">
+                                  <UserAvatar photo={slot.enseignant_photo} name={slot.enseignant_nom} className="w-4 h-4" />
+                                  <p className="text-muted-foreground truncate">{slot.enseignant_nom}</p>
+                                </div>
+                              )}
                               {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
                             </div>
                           )}

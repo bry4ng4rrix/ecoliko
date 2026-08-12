@@ -25,6 +25,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { NotificationBell } from '@/components/NotificationBell'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
@@ -84,6 +85,7 @@ function StudentDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <UserAvatar photo={user?.photo} name={user ? `${user.first_name} ${user.last_name}` : ''} className="w-9 h-9" />
             <NotificationBell />
             <button
               onClick={handleLogout}
@@ -240,9 +242,7 @@ function StudentProfile() {
         {/* Profile Card */}
         <div className="lg:col-span-1 bg-card rounded-lg border border-border p-6">
           <div className="flex flex-col items-center">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-              <User className="w-10 h-10 text-primary" />
-            </div>
+            <UserAvatar photo={dossier.photo} name={`${dossier.prenom} ${dossier.nom}`} className="w-20 h-20 mb-4" />
             <h2 className="text-xl font-bold">{dossier.prenom} {dossier.nom}</h2>
             <p className="text-sm text-muted-foreground">Étudiant</p>
             <div className="mt-6 space-y-2 w-full text-sm">
@@ -389,7 +389,12 @@ function StudentEmploiDuTemps() {
                             style={{ backgroundColor: `${slot.matiere_couleur ?? '#6366f1'}22` }}
                           >
                             <p className="font-semibold">{slot.matiere_intitule}</p>
-                            {slot.enseignant_nom && <p className="text-muted-foreground">{slot.enseignant_nom}</p>}
+                            {slot.enseignant_nom && (
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <UserAvatar photo={slot.enseignant_photo} name={slot.enseignant_nom} className="w-4 h-4" />
+                                <p className="text-muted-foreground truncate">{slot.enseignant_nom}</p>
+                              </div>
+                            )}
                             {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
                           </div>
                         )}

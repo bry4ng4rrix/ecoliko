@@ -6,11 +6,12 @@ from .base import ValidatedModelSerializer
 
 class DossierEnseignantSerializer(ValidatedModelSerializer):
     enseignant_nom = serializers.CharField(source='enseignant.get_full_name', read_only=True)
+    enseignant_photo = serializers.ImageField(source='enseignant.photo', read_only=True, default=None)
 
     class Meta:
         model = DossierEnseignant
         fields = (
-            'id', 'enseignant', 'enseignant_nom', 'type_contrat', 'date_embauche', 'diplomes',
+            'id', 'enseignant', 'enseignant_nom', 'enseignant_photo', 'type_contrat', 'date_embauche', 'diplomes',
             'salaire', 'volume_horaire_hebdo', 'documents_rh', 'date_creation', 'date_modification',
         )
         read_only_fields = ('date_creation', 'date_modification')

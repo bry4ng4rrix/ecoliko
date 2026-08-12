@@ -11,6 +11,7 @@ import { dossierEnseignantService, paiementSalaireService, staffService } from '
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const TYPE_CONTRAT_LABELS = { CDI: 'CDI', CDD: 'CDD', VACATAIRE: 'Vacataire', STAGIAIRE: 'Stagiaire' }
 
@@ -150,7 +151,12 @@ export function DossierEnseignantPanel() {
             )}
             {(dossiers ?? []).map((d) => (
               <tr key={d.id} className="hover:bg-muted/50">
-                <td className="px-4 py-3">{d.enseignant_nom}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <UserAvatar photo={d.enseignant_photo} name={d.enseignant_nom} className="w-7 h-7" />
+                    <span>{d.enseignant_nom}</span>
+                  </div>
+                </td>
                 <td className="px-4 py-3">{TYPE_CONTRAT_LABELS[d.type_contrat] ?? '—'}</td>
                 <td className="px-4 py-3">{d.date_embauche ?? '—'}</td>
                 <td className="px-4 py-3">{d.volume_horaire_hebdo ? `${d.volume_horaire_hebdo} h/sem` : '—'}</td>

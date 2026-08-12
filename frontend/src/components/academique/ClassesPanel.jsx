@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useCreateResource, useDeleteResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
 import { classeService, etudiantService, salleService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const EMPTY_FORM = {
   nom: '', capacite_max: 40, titulaire: '', salle: '', delegue: '',
@@ -182,7 +183,11 @@ export function ClassesPanel() {
               </div>
             </div>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>Prof principal: <span className="font-semibold text-foreground">{cls.titulaire_nom ?? 'À assigner'}</span></p>
+              <p className="flex items-center gap-1.5">
+                Prof principal:
+                {cls.titulaire_nom && <UserAvatar photo={cls.titulaire_photo} name={cls.titulaire_nom} className="w-5 h-5" />}
+                <span className="font-semibold text-foreground">{cls.titulaire_nom ?? 'À assigner'}</span>
+              </p>
               <p>Salle: <span className="font-semibold text-foreground">{cls.salle_nom ?? 'Non assignée'}</span></p>
               <p>Délégué de classe: <span className="font-semibold text-foreground">{cls.delegue_nom ?? 'À désigner'}</span></p>
               {cls.frais_ecolage_mensuel && (

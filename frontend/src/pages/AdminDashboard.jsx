@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useResourceList } from '@/hooks/useResource'
 import { classeService, etudiantService, staffService } from '@/services'
 import { NotificationBell } from '@/components/NotificationBell'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
 import { ClassesPanel } from '@/components/academique/ClassesPanel'
@@ -30,6 +31,7 @@ import { DossierEnseignantPanel } from '@/components/rh/DossierEnseignantPanel'
 import { EvenementsCalendrierPanel } from '@/components/calendrier/EvenementsCalendrierPanel'
 import { AnneesScolairesPanel } from '@/components/parametres/AnneesScolairesPanel'
 import { EcoleInfoPanel } from '@/components/parametres/EcoleInfoPanel'
+import { MonProfilPanel } from '@/components/parametres/MonProfilPanel'
 import { DemandesInscriptionPanel } from '@/components/inscriptions/DemandesInscriptionPanel'
 import { NotesEvaluationsPanel } from '@/components/notes/NotesEvaluationsPanel'
 
@@ -305,6 +307,15 @@ function AdminDashboard() {
 
         <Card className="shadow-sm">
           <CardHeader>
+            <CardTitle>Mon profil</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <MonProfilPanel />
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader>
             <CardTitle>Informations de l'établissement</CardTitle>
           </CardHeader>
           <CardContent>
@@ -384,6 +395,7 @@ function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <UserAvatar photo={user?.photo} name={user ? `${user.first_name} ${user.last_name}` : ''} className="w-9 h-9" />
             <NotificationBell />
             <button
               onClick={handleLogout}

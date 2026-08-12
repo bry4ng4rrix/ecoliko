@@ -6,6 +6,7 @@ import { useCreateResource, useDeleteResource, useResourceList, useUpdateResourc
 import { classeService, dossierEnseignantService, matiereService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const ROLE_LABELS = {
   ADMIN: 'Administrateur', RESPONSABLE: 'Responsable pédagogique',
@@ -193,7 +194,16 @@ export function PersonnelPanel({ roleFilter, title }) {
     const cols = [
       {
         id: 'nom', header: 'Nom', accessorFn: (p) => `${p.first_name} ${p.last_name}`,
-        cell: ({ row }) => `${row.original.first_name} ${row.original.last_name}`,
+        cell: ({ row }) => {
+          const p = row.original
+          const nom = `${p.first_name} ${p.last_name}`
+          return (
+            <div className="flex items-center gap-2">
+              <UserAvatar photo={p.photo} name={nom} className="w-7 h-7" />
+              <span>{nom}</span>
+            </div>
+          )
+        },
       },
     ]
     if (!roleFilter) {

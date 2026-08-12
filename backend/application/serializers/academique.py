@@ -82,6 +82,7 @@ class ClasseSerializer(ValidatedModelSerializer):
     filiere_intitule = serializers.CharField(source='filiere.intitule', read_only=True, default=None)
     salle_nom = serializers.CharField(source='salle.nom', read_only=True, default=None)
     titulaire_nom = serializers.SerializerMethodField()
+    titulaire_photo = serializers.ImageField(source='titulaire.photo', read_only=True, default=None)
     delegue_nom = serializers.SerializerMethodField()
     delegue_utilisateur = serializers.IntegerField(source='delegue.utilisateur_id', read_only=True, default=None)
     enseignants = serializers.PrimaryKeyRelatedField(
@@ -93,7 +94,7 @@ class ClasseSerializer(ValidatedModelSerializer):
         model = Classe
         fields = (
             'id', 'annee_scolaire', 'niveau', 'niveau_intitule', 'filiere', 'filiere_intitule',
-            'nom', 'section', 'capacite_max', 'titulaire', 'titulaire_nom', 'salle', 'salle_nom',
+            'nom', 'section', 'capacite_max', 'titulaire', 'titulaire_nom', 'titulaire_photo', 'salle', 'salle_nom',
             'delegue', 'delegue_nom', 'delegue_utilisateur', 'enseignants', 'enseignants_noms',
             'frais_ecolage_mensuel', 'frais_inscription', 'frais_reinscription', 'est_active', 'effectif',
             'date_creation',

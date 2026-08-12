@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCreateResource, useDeleteResource, useResourceList, useUpdateResource } from '@/hooks/useResource'
 import { matiereService, staffService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const EMPTY_FORM = { intitule: '', enseignant: '', couleur: '#6366f1' }
 const EMPTY_LIGNE = () => ({ intitule: '', enseignant: '', couleur: '#6366f1' })
@@ -192,7 +193,10 @@ export function MatieresPanel() {
                 </div>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">Enseignant: {m.enseignant_nom ?? 'Non assigné'}</p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              {m.enseignant_nom && <UserAvatar photo={m.enseignant_photo} name={m.enseignant_nom} className="w-6 h-6" />}
+              <span>Enseignant: {m.enseignant_nom ?? 'Non assigné'}</span>
+            </div>
           </div>
         ))}
       </div>

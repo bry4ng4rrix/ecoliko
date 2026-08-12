@@ -41,14 +41,15 @@ class EmploiDuTempsSerializer(ValidatedModelSerializer):
     matiere_intitule = serializers.CharField(source='matiere.intitule', read_only=True)
     matiere_couleur = serializers.CharField(source='matiere.couleur', read_only=True)
     enseignant_nom = serializers.SerializerMethodField()
+    enseignant_photo = serializers.ImageField(source='enseignant.photo', read_only=True, default=None)
     salle_nom = serializers.CharField(source='salle.nom', read_only=True, default=None)
 
     class Meta:
         model = EmploiDuTemps
         fields = (
             'id', 'classe', 'classe_nom', 'matiere', 'matiere_intitule', 'matiere_couleur', 'enseignant',
-            'enseignant_nom', 'jour', 'heure_debut', 'heure_fin', 'salle', 'salle_nom', 'groupe', 'est_actif',
-            'cree_par', 'date_creation',
+            'enseignant_nom', 'enseignant_photo', 'jour', 'heure_debut', 'heure_fin', 'salle', 'salle_nom',
+            'groupe', 'est_actif', 'cree_par', 'date_creation',
         )
         read_only_fields = ('cree_par', 'date_creation')
 

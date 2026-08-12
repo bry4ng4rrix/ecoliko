@@ -23,12 +23,13 @@ def _generer_code_matiere(intitule, ecole):
 
 class MatiereSerializer(ValidatedModelSerializer):
     enseignant_nom = serializers.SerializerMethodField()
+    enseignant_photo = serializers.ImageField(source='enseignant.photo', read_only=True, default=None)
 
     class Meta:
         model = Matiere
         fields = (
             'id', 'ecole', 'code', 'intitule', 'description', 'coefficient', 'couleur',
-            'filiere', 'niveau', 'enseignant', 'enseignant_nom', 'est_active',
+            'filiere', 'niveau', 'enseignant', 'enseignant_nom', 'enseignant_photo', 'est_active',
         )
         read_only_fields = ('ecole',)
         # Le validateur unique_together auto-généré par DRF force TOUS les champs du tuple

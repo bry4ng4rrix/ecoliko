@@ -27,6 +27,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { CahierTextePanel } from '@/components/pedagogie/CahierTextePanel'
 import { DisciplinePanel } from '@/components/discipline/DisciplinePanel'
 
@@ -74,6 +75,7 @@ function TeacherDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <UserAvatar photo={user?.photo} name={user ? `${user.first_name} ${user.last_name}` : ''} className="w-9 h-9" />
             <NotificationBell />
             <button
               onClick={handleLogout}
@@ -1092,6 +1094,7 @@ function TeacherSettings() {
     first_name: user?.first_name ?? '', last_name: user?.last_name ?? '',
     email: user?.email ?? '', telephone: user?.telephone ?? '',
   })
+  const [photo, setPhoto] = useState(null)
   const [saving, setSaving] = useState(false)
 
   const mesMatieres = matieres?.filter((m) => m.enseignant === user?.id) ?? []
@@ -1102,8 +1105,13 @@ function TeacherSettings() {
     e.preventDefault()
     setSaving(true)
     try {
-      const updated = await authService.updateProfile(form)
+      const payload = new FormData()
+      Object.entries(form).forEach(([key, value]) => payload.append(key, value ?? ''))
+      if (photo) payload.append('photo', photo)
+
+      const updated = await authService.updateProfile(payload)
       setUser(updated)
+      setPhoto(null)
       toast.success('Profil mis à jour.')
     } catch (err) {
       const data = err.response?.data
@@ -1122,6 +1130,20 @@ function TeacherSettings() {
 
       <form onSubmit={handleSubmit} className="bg-card rounded-lg border border-border p-6">
         <h2 className="text-lg font-bold mb-6">Informations personnelles</h2>
+        <div className="flex items-center gap-4 mb-6">
+          <UserAvatar
+            photo={photo ? URL.createObjectURL(photo) : user?.photo}
+            name={`${form.first_name} ${form.last_name}`}
+            className="w-20 h-20"
+          />
+          <div>
+            <label className="block text-sm font-semibold mb-2">Photo de profil</label>
+            <input
+              type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              className="text-sm text-muted-foreground file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-muted file:text-foreground file:text-sm"
+            />
+          </div>
+        </div>
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
