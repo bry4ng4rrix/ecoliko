@@ -7,9 +7,9 @@ class EvenementCalendrierSerializer(ValidatedModelSerializer):
         model = EvenementCalendrier
         fields = (
             'id', 'ecole', 'titre', 'type_evenement', 'date_debut', 'date_fin', 'description',
-            'cree_par', 'date_creation',
+            'source_externe', 'cree_par', 'date_creation',
         )
-        read_only_fields = ('ecole', 'cree_par', 'date_creation')
+        read_only_fields = ('ecole', 'source_externe', 'cree_par', 'date_creation')
 
     def create(self, validated_data):
         request = self.context['request']

@@ -14,11 +14,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAnneeActive } from '@/hooks/useAnneeActive'
 import { useCreateResource, useResourceList } from '@/hooks/useResource'
 import {
-  anneeScolaireService, bulletinService, demandeDocumentService, emploiDuTempsService, etudiantService,
-  fetchDossierFinancier, fetchMoyenneTrimestre, matiereService, noteService, paiementService, presenceService,
+  bulletinService, classeService, demandeDocumentService, emploiDuTempsService,
+  etudiantService, fetchDossierFinancier, fetchMoyenneTrimestre, fraisScolariteService, matiereService,
+  noteService, paiementService, presenceService,
   soumettreJustification, telechargerBulletinPdf, telechargerDocumentPdf, trimestreService,
 } from '@/services'
 import { Button } from '@/components/ui/button'
+import { MonthCalendar } from '@/components/ui/month-calendar'
 import { NotificationBell } from '@/components/NotificationBell'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
@@ -45,6 +47,7 @@ function StudentDashboard() {
     { id: 'home', label: 'Tableau de bord', icon: Home },
     { id: 'profil', label: 'Mon Profil', icon: User },
     { id: 'academique', label: 'Gestion Académique', icon: BookOpen },
+    { id: 'edt', label: 'Emploi du Temps', icon: Calendar },
     { id: 'notes', label: 'Notes & Résultats', icon: BarChart3 },
     { id: 'presence', label: 'Présence', icon: Clock },
     { id: 'admin', label: 'Gestion Administrative', icon: FileText },
@@ -121,6 +124,7 @@ function StudentDashboard() {
             {activeTab === 'home' && <StudentDashboardOverview />}
             {activeTab === 'profil' && <StudentProfile />}
             {activeTab === 'academique' && <AcademicManagement />}
+            {activeTab === 'edt' && <StudentEmploiDuTemps />}
             {activeTab === 'notes' && <GradesResults />}
             {activeTab === 'presence' && <AttendanceTracking />}
             {activeTab === 'admin' && <AdministrativeStatus />}
@@ -289,62 +293,109 @@ function StudentProfile() {
 }
 
 // ============ ACADEMIC MANAGEMENT ============
-const JOUR_LABELS = { LUN: 'Lundi', MAR: 'Mardi', MER: 'Mercredi', JEU: 'Jeudi', VEN: 'Vendredi', SAM: 'Samedi' }
+const JOURS_SEMAINE = [
+  { code: 'LUN', label: 'Lundi' }, { code: 'MAR', label: 'Mardi' }, { code: 'MER', label: 'Mercredi' },
+  { code: 'JEU', label: 'Jeudi' }, { code: 'VEN', label: 'Vendredi' }, { code: 'SAM', label: 'Samedi' },
+]
 
 function AcademicManagement() {
-  const { data: emploiDuTemps } = useResourceList('emplois-du-temps', emploiDuTempsService)
   const { data: matieres } = useResourceList('matieres', matiereService)
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Gestion Académique</h1>
-        <p className="text-muted-foreground mt-1">Consultation de votre emploi du temps</p>
+        <p className="text-muted-foreground mt-1">Matières et cahier de textes</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-bold mb-4">Mon emploi du temps</h2>
-          {(emploiDuTemps ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucun créneau enregistré.</p>
-          ) : (
-            <div className="space-y-3">
-              {emploiDuTemps.map((slot) => (
-                <div key={slot.id} className="flex items-center gap-4 p-4 bg-muted rounded-lg">
-                  <Calendar className="w-5 h-5 text-primary flex-shrink-0" />
-                  <div className="flex-1">
-                    <p className="font-semibold">{JOUR_LABELS[slot.jour]} {slot.heure_debut}–{slot.heure_fin}</p>
-                    <p className="text-sm text-muted-foreground">{slot.matiere_intitule} - {slot.enseignant_nom ?? 'Non assigné'}</p>
-                  </div>
-                  {slot.salle_nom && (
-                    <span className="px-3 py-1 bg-primary/10 text-primary text-xs rounded-full font-medium">{slot.salle_nom}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="bg-card rounded-lg border border-border p-6">
-          <h2 className="text-lg font-bold mb-4">Matières de l'établissement</h2>
-          {(matieres ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune matière.</p>
-          ) : (
-            <div className="space-y-3">
-              {matieres.map((subject) => (
-                <div key={subject.id} className="flex justify-between items-center p-3 bg-muted rounded-lg text-sm">
-                  <span className="font-medium">{subject.intitule}</span>
-                  <span className="text-muted-foreground">Coef. {subject.coefficient}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="bg-card rounded-lg border border-border p-6">
+        <h2 className="text-lg font-bold mb-4">Matières de l'établissement</h2>
+        {(matieres ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucune matière.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {matieres.map((subject) => (
+              <div key={subject.id} className="flex justify-between items-center p-3 bg-muted rounded-lg text-sm">
+                <span className="font-medium">{subject.intitule}</span>
+                <span className="text-muted-foreground">Coef. {subject.coefficient}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div>
         <h2 className="text-xl font-bold mb-4">Cahier de textes</h2>
         <CahierTextePanel />
+      </div>
+    </div>
+  )
+}
+
+// ============ EMPLOI DU TEMPS ============
+function StudentEmploiDuTemps() {
+  const { data: emploiDuTemps, isLoading } = useResourceList('emplois-du-temps', emploiDuTempsService)
+
+  const creneaux = [...new Set((emploiDuTemps ?? []).map((s) => `${s.heure_debut}|${s.heure_fin}`))]
+    .sort()
+    .map((cle) => {
+      const [heure_debut, heure_fin] = cle.split('|')
+      return { heure_debut, heure_fin }
+    })
+
+  const slotAt = (jour, heure_debut) =>
+    (emploiDuTemps ?? []).find((s) => s.jour === jour && s.heure_debut === heure_debut)
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Emploi du Temps</h1>
+        <p className="text-muted-foreground mt-1">Votre planning hebdomadaire de cours</p>
+      </div>
+
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        {isLoading && <p className="p-6 text-sm text-muted-foreground">Chargement...</p>}
+        {!isLoading && creneaux.length === 0 && (
+          <p className="p-6 text-sm text-muted-foreground">Aucun créneau enregistré.</p>
+        )}
+        {!isLoading && creneaux.length > 0 && (
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted">
+                <th className="px-3 py-3 text-left font-semibold border border-border w-24">Horaire</th>
+                {JOURS_SEMAINE.map((j) => (
+                  <th key={j.code} className="px-3 py-3 text-center font-semibold border border-border">{j.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {creneaux.map(({ heure_debut, heure_fin }) => (
+                <tr key={heure_debut}>
+                  <td className="px-3 py-2 border border-border text-xs font-medium text-muted-foreground whitespace-nowrap align-top">
+                    {heure_debut.slice(0, 5)}–{heure_fin.slice(0, 5)}
+                  </td>
+                  {JOURS_SEMAINE.map((jour) => {
+                    const slot = slotAt(jour.code, heure_debut)
+                    return (
+                      <td key={jour.code} className="border border-border p-1 align-top min-w-[140px]">
+                        {slot && (
+                          <div
+                            className="rounded-lg p-2 text-xs h-full"
+                            style={{ backgroundColor: `${slot.matiere_couleur ?? '#6366f1'}22` }}
+                          >
+                            <p className="font-semibold">{slot.matiere_intitule}</p>
+                            {slot.enseignant_nom && <p className="text-muted-foreground">{slot.enseignant_nom}</p>}
+                            {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )
@@ -589,6 +640,8 @@ function AdministrativeStatus() {
   const dossier = useMonDossier()
   const anneeActive = useAnneeActive()
   const { data: paiements } = useResourceList('paiements', paiementService)
+  const { data: classes } = useResourceList('classes', classeService)
+  const { data: fraisScolarite } = useResourceList('frais-scolarite', fraisScolariteService)
 
   const { data: dossierFinancier } = useQuery({
     queryKey: ['dossier-financier', dossier?.id, anneeActive?.id],
@@ -618,72 +671,92 @@ function AdministrativeStatus() {
         </div>
       </div>
 
-      {/* Payment History by month/year */}
-      <PaiementsParMoisTable paiements={paiements} />
+      <FraisEcolageCalendar
+        dossier={dossier} anneeActive={anneeActive} paiements={paiements}
+        classes={classes} fraisScolarite={fraisScolarite}
+      />
     </div>
   )
 }
 
-const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
-const STATUT_CELL_COLORS = {
-  PAYE: 'bg-green-500/20 text-green-700', PARTIEL: 'bg-orange-500/20 text-orange-700',
-  EN_ATTENTE: 'bg-gray-500/10 text-gray-500', ANNULE: 'bg-gray-400/10 text-gray-400',
-  EN_RETARD: 'bg-red-500/20 text-red-700',
-}
+// ============ CALENDRIER DES FRAIS (vue mensuelle type agenda) ============
+function FraisEcolageCalendar({ dossier, anneeActive, paiements, classes, fraisScolarite }) {
+  const [cursor, setCursor] = useState(() => {
+    const now = new Date()
+    return { mois: now.getMonth(), annee: now.getFullYear() }
+  })
 
-function PaiementsParMoisTable({ paiements }) {
-  const { data: annees } = useResourceList('annees-scolaires', anneeScolaireService)
+  const classeActuelle = dossier?.classe_actuelle
+    ? (classes ?? []).find((c) => c.nom === dossier.classe_actuelle)
+    : null
+  const tarifNiveau = classeActuelle
+    ? (fraisScolarite ?? []).find(
+        (f) => f.annee_scolaire === anneeActive?.id && f.niveau === classeActuelle.niveau
+          && (f.filiere ?? null) === (classeActuelle.filiere ?? null)
+      )
+    : null
 
-  const parAnnee = {}
-  for (const p of paiements ?? []) {
-    if (!parAnnee[p.annee_scolaire]) parAnnee[p.annee_scolaire] = {}
-    parAnnee[p.annee_scolaire][p.mois_couvert] = p
+  const montantInscription = classeActuelle?.frais_inscription ?? tarifNiveau?.montant_inscription ?? null
+  const montantEcolageMensuel = classeActuelle?.frais_ecolage_mensuel
+    ?? (tarifNiveau ? Number(tarifNiveau.montant_annuel) / 12 : null)
+
+  const mesPaiements = (paiements ?? []).filter((p) => p.annee_scolaire === anneeActive?.id)
+  const totalPayeEcolage = mesPaiements
+    .filter((p) => p.statut === 'PAYE')
+    .reduce((somme, p) => somme + Number(p.montant), 0)
+  const droitInscriptionPaye = montantInscription != null && totalPayeEcolage >= Number(montantInscription)
+
+  // Même règle d'échéance que côté admin (`PaiementsEtudiantDialog`) : le 5 du mois, l'année
+  // scolaire étant considérée comme un cycle septembre → août.
+  const dateEcheancePourMois = (moisCouvert) => {
+    const anneeDebut = new Date(anneeActive.date_debut).getFullYear()
+    const annee = moisCouvert >= 9 ? anneeDebut : anneeDebut + 1
+    return `${annee}-${String(moisCouvert).padStart(2, '0')}-05`
   }
-  const anneeIds = Object.keys(parAnnee).map(Number).sort((a, b) => b - a)
-  const libelle = (id) => annees?.find((a) => a.id === id)?.libelle ?? `Année #${id}`
+
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+
+  const events = []
+  if (anneeActive) {
+    events.push({
+      date: anneeActive.date_debut,
+      label: droitInscriptionPaye ? "Inscription — Payé" : "Inscription — Non payé",
+      color: droitInscriptionPaye ? 'bg-green-600' : 'bg-red-600',
+      title: montantInscription != null ? `Droit d'inscription : ${Number(montantInscription).toLocaleString('fr-FR')} Ar` : "Droit d'inscription",
+    })
+    for (let moisCouvert = 1; moisCouvert <= 12; moisCouvert += 1) {
+      const echeance = dateEcheancePourMois(moisCouvert)
+      const paiementDuMois = mesPaiements.find((p) => p.mois_couvert === moisCouvert)
+      const paye = paiementDuMois?.statut === 'PAYE'
+      const enRetard = !paye && echeance < aujourdhui
+      events.push({
+        date: echeance,
+        label: paye ? 'Écolage — Payé' : enRetard ? 'Écolage — En retard' : 'Écolage — Non payé',
+        color: paye ? 'bg-green-600' : enRetard ? 'bg-red-600' : 'bg-gray-400',
+        title: montantEcolageMensuel != null ? `Écolage : ${Number(montantEcolageMensuel).toLocaleString('fr-FR')} Ar` : 'Écolage',
+      })
+    }
+  }
+
+  const navigate = (dir) => {
+    if (dir === 'aujourdhui') {
+      const now = new Date()
+      setCursor({ mois: now.getMonth(), annee: now.getFullYear() })
+      return
+    }
+    setCursor((prev) => {
+      let mois = prev.mois + dir
+      let annee = prev.annee
+      if (mois < 0) { mois = 11; annee -= 1 }
+      if (mois > 11) { mois = 0; annee += 1 }
+      return { mois, annee }
+    })
+  }
 
   return (
-    <div className="bg-card rounded-lg border border-border p-6">
-      <h2 className="text-lg font-bold mb-4">Paiements d'écolage par mois</h2>
-      {anneeIds.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Aucun paiement enregistré.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border-separate border-spacing-1">
-            <thead>
-              <tr>
-                <th className="px-2 py-2 text-left">Année</th>
-                {MOIS_LABELS.map((m) => <th key={m} className="px-2 py-2 text-center text-xs">{m}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {anneeIds.map((anneeId) => (
-                <tr key={anneeId}>
-                  <td className="px-2 py-2 font-medium whitespace-nowrap">{libelle(anneeId)}</td>
-                  {MOIS_LABELS.map((_, idx) => {
-                    const mois = idx + 1
-                    const p = parAnnee[anneeId][mois]
-                    return (
-                      <td key={mois} className="text-center">
-                        {p ? (
-                          <div
-                            title={`${Number(p.montant).toLocaleString()} Ar — ${STATUT_LABELS[p.statut] ?? p.statut}`}
-                            className={`rounded px-1.5 py-2 text-xs font-medium ${STATUT_CELL_COLORS[p.statut] ?? 'bg-muted'}`}
-                          >
-                            {Number(p.montant).toLocaleString()}
-                          </div>
-                        ) : (
-                          <div className="rounded px-1.5 py-2 text-xs text-muted-foreground bg-muted/40">—</div>
-                        )}
-                      </td>
-                    )
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div>
+      <h2 className="text-lg font-bold mb-4">Frais généraux et écolage</h2>
+      <MonthCalendar mois={cursor.mois} annee={cursor.annee} onNavigate={navigate} events={events} />
     </div>
   )
 }

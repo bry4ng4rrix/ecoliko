@@ -410,18 +410,34 @@ function GradesEvaluation() {
     }
   }, [trimestres, selectedTrimestre])
 
-  const notesFiltrees = (notes ?? []).filter(
-    (n) => n.matiere === selectedMatiere && n.trimestre === selectedTrimestre
-  )
+  // Toutes les notes de la matière, tous trimestres confondus — sert à afficher ce qui a été
+  // saisi même quand le trimestre sélectionné n'est pas celui de la note qu'on vient d'ajouter
+  // (sinon une note fraîchement enregistrée dans un autre trimestre semble avoir disparu).
+  const notesMatiere = (notes ?? []).filter((n) => n.matiere === selectedMatiere)
+
+  // Moyenne annuelle de la matière = moyenne des moyennes de chaque trimestre (seuls les
+  // trimestres où au moins une note existe comptent), même principe que
+  // `moyenne_generale` côté backend — pas une simple division par 3 fixe qui pénaliserait
+  // les trimestres pas encore notés.
+  const moyenneAnnuelle = (notesEtudiantMatiere) => {
+    const moyennesParTrimestre = (trimestres ?? [])
+      .map((t) => {
+        const notesDuTrimestre = notesEtudiantMatiere.filter((n) => n.trimestre === t.id)
+        return notesDuTrimestre.length
+          ? notesDuTrimestre.reduce((sum, n) => sum + Number(n.valeur), 0) / notesDuTrimestre.length
+          : null
+      })
+      .filter((m) => m !== null)
+    return moyennesParTrimestre.length
+      ? (moyennesParTrimestre.reduce((sum, m) => sum + m, 0) / moyennesParTrimestre.length).toFixed(2)
+      : null
+  }
 
   const rows = (etudiants ?? [])
     .filter((etu) => !filtreClasse || etu.classe_actuelle === filtreClasse)
     .map((etu) => {
-      const notesEtu = notesFiltrees.filter((n) => n.etudiant === etu.id)
-      const moyenne = notesEtu.length
-        ? (notesEtu.reduce((sum, n) => sum + Number(n.valeur), 0) / notesEtu.length).toFixed(2)
-        : null
-      return { etudiant: etu, notes: notesEtu, moyenne }
+      const notesTousTrimestres = notesMatiere.filter((n) => n.etudiant === etu.id)
+      return { etudiant: etu, notesTousTrimestres, moyenne: moyenneAnnuelle(notesTousTrimestres) }
     })
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
@@ -581,7 +597,7 @@ function GradesEvaluation() {
             <tr>
               <th className="px-6 py-3 text-left text-sm font-semibold">Élève</th>
               <th className="px-6 py-3 text-left text-sm font-semibold">Notes saisies</th>
-              <th className="px-6 py-3 text-center text-sm font-semibold">Moyenne</th>
+              <th className="px-6 py-3 text-center text-sm font-semibold">Moyenne annuelle</th>
               <th className="px-6 py-3 text-center text-sm font-semibold">Actions</th>
               <th className="px-6 py-3 text-center text-sm font-semibold">Bulletin</th>
             </tr>
@@ -590,11 +606,14 @@ function GradesEvaluation() {
             {rows.length === 0 && (
               <tr><td colSpan={5} className="px-6 py-4 text-center text-sm text-muted-foreground">Aucun élève à afficher.</td></tr>
             )}
-            {rows.map(({ etudiant, notes: notesEtu, moyenne }) => (
+            {rows.map(({ etudiant, notesTousTrimestres, moyenne }) => (
               <tr key={etudiant.id} className="hover:bg-muted/50">
                 <td className="px-6 py-4 text-sm font-medium">{etudiant.prenom} {etudiant.nom}</td>
                 <td className="px-6 py-4 text-sm text-muted-foreground">
-                  {notesEtu.length === 0 ? '—' : notesEtu.map(n => `${n.type_evaluation}: ${n.valeur}`).join(', ')}
+                  {notesTousTrimestres.length === 0 ? '—' : notesTousTrimestres.map((n) => {
+                    const trimestre = (trimestres ?? []).find((t) => t.id === n.trimestre)
+                    return `T${trimestre?.numero ?? '?'} ${n.type_evaluation}: ${n.valeur}`
+                  }).join(', ')}
                 </td>
                 <td className="px-6 py-4 text-center text-sm font-bold text-primary">{moyenne ?? '—'}</td>
                 <td className="px-6 py-4 text-center space-x-2">

@@ -313,6 +313,66 @@ class EvenementCalendrierTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class SynchronisationJoursFeriesTests(APITestCase):
+    def _jours_feries_factices(self):
+        from datetime import date
+        return [
+            {'uid': 'ext-1', 'titre': "Fête de l'Indépendance", 'date': date(2025, 12, 15), 'description': None},
+            {'uid': 'ext-2', 'titre': 'Assomption', 'date': date(2026, 1, 10), 'description': None},
+        ]
+
+    def test_admin_can_sync_and_it_is_idempotent(self):
+        from unittest.mock import patch
+
+        ecole = f.make_ecole()
+        admin = f.make_user(role=User.Role.ADMIN, ecole=ecole)
+        self.client.force_authenticate(user=admin)
+
+        with patch(
+            'application.views.calendrier.recuperer_jours_feries_madagascar',
+            return_value=self._jours_feries_factices(),
+        ) as mock_fetch:
+            response = self.client.post('/api/evenements-calendrier/synchroniser-jours-feries/')
+            self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+            self.assertEqual(response.data['crees'], 2)
+            # Pas de bornage par année scolaire : on importe tout ce que renvoie la source,
+            # pour que les jours fériés apparaissent sur n'importe quel mois du calendrier.
+            mock_fetch.assert_called_once_with()
+
+            evenements = EvenementCalendrier.objects.filter(ecole=ecole, type_evenement='JOUR_FERIE')
+            self.assertEqual(evenements.count(), 2)
+
+            # Une resynchronisation ne doit pas créer de doublons.
+            response2 = self.client.post('/api/evenements-calendrier/synchroniser-jours-feries/')
+            self.assertEqual(response2.status_code, status.HTTP_200_OK)
+            self.assertEqual(response2.data['crees'], 0)
+            self.assertEqual(response2.data['deja_existants'], 2)
+            self.assertEqual(EvenementCalendrier.objects.filter(ecole=ecole).count(), 2)
+
+    def test_teacher_cannot_sync(self):
+        ecole = f.make_ecole()
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=ecole)
+        self.client.force_authenticate(user=prof)
+        response = self.client.post('/api/evenements-calendrier/synchroniser-jours-feries/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_sync_surfaces_external_source_error(self):
+        from unittest.mock import patch
+
+        from application.services.jours_feries import ErreurRecuperationJoursFeries
+
+        ecole = f.make_ecole()
+        admin = f.make_user(role=User.Role.ADMIN, ecole=ecole)
+        self.client.force_authenticate(user=admin)
+
+        with patch(
+            'application.views.calendrier.recuperer_jours_feries_madagascar',
+            side_effect=ErreurRecuperationJoursFeries('indisponible'),
+        ):
+            response = self.client.post('/api/evenements-calendrier/synchroniser-jours-feries/')
+            self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+
+
 class DocumentJustificatifEtudiantTests(APITestCase):
     def test_admin_can_upload_document(self):
         from django.core.files.uploadedfile import SimpleUploadedFile

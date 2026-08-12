@@ -30,6 +30,12 @@ export function EmploiDuTempsCalendar() {
 
   const enseignants = (personnel ?? []).filter((p) => p.role === 'ENSEIGNANT')
   const slotsClasse = (emploiDuTemps ?? []).filter((s) => String(s.classe) === String(classeId))
+  const creneaux = [...new Set(slotsClasse.map((s) => `${s.heure_debut}|${s.heure_fin}`))]
+    .sort()
+    .map((cle) => {
+      const [heure_debut, heure_fin] = cle.split('|')
+      return { heure_debut, heure_fin }
+    })
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
 
@@ -134,41 +140,59 @@ export function EmploiDuTempsCalendar() {
 
       {!classeId && <p className="text-sm text-muted-foreground">Sélectionnez une classe pour voir son emploi du temps.</p>}
 
-      {classeId && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
-          {JOURS.map((jour) => {
-            const slots = slotsClasse
-              .filter((s) => s.jour === jour.code)
-              .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut))
-            return (
-              <div key={jour.code} className="bg-card border border-border rounded-lg p-3 min-h-[180px]">
-                <p className="font-semibold text-sm mb-3 text-center border-b border-border pb-2">{jour.label}</p>
-                <div className="space-y-2">
-                  {slots.length === 0 && <p className="text-xs text-muted-foreground text-center">—</p>}
-                  {slots.map((slot) => (
-                    <div
-                      key={slot.id} className="rounded-lg p-2 text-xs relative group"
-                      style={{ backgroundColor: `${slot.matiere_couleur ?? '#6366f1'}22` }}
-                    >
-                      <button
-                        onClick={() => handleDelete(slot.id)}
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                      </button>
-                      <p className="font-semibold">{slot.heure_debut.slice(0, 5)}–{slot.heure_fin.slice(0, 5)}</p>
-                      <p>{slot.matiere_intitule}</p>
-                      {slot.groupe && <p className="font-medium">{slot.groupe}</p>}
-                      {slot.enseignant_nom && <p className="text-muted-foreground">{slot.enseignant_nom}</p>}
-                      {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
-                    </div>
+      {classeId && isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
+
+      {classeId && !isLoading && (
+        creneaux.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Aucun créneau enregistré pour cette classe.</p>
+        ) : (
+          <div className="bg-card rounded-lg border border-border overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-muted">
+                  <th className="px-3 py-3 text-left font-semibold border border-border w-24">Horaire</th>
+                  {JOURS.map((j) => (
+                    <th key={j.code} className="px-3 py-3 text-center font-semibold border border-border">{j.label}</th>
                   ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+                </tr>
+              </thead>
+              <tbody>
+                {creneaux.map(({ heure_debut, heure_fin }) => (
+                  <tr key={heure_debut}>
+                    <td className="px-3 py-2 border border-border text-xs font-medium text-muted-foreground whitespace-nowrap align-top">
+                      {heure_debut.slice(0, 5)}–{heure_fin.slice(0, 5)}
+                    </td>
+                    {JOURS.map((jour) => {
+                      const slot = slotsClasse.find((s) => s.jour === jour.code && s.heure_debut === heure_debut)
+                      return (
+                        <td key={jour.code} className="border border-border p-1 align-top min-w-[140px]">
+                          {slot && (
+                            <div
+                              className="rounded-lg p-2 text-xs relative group"
+                              style={{ backgroundColor: `${slot.matiere_couleur ?? '#6366f1'}22` }}
+                            >
+                              <button
+                                onClick={() => handleDelete(slot.id)}
+                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Supprimer ce créneau"
+                              >
+                                <Trash2 className="w-3 h-3 text-red-500" />
+                              </button>
+                              <p className="font-semibold">{slot.matiere_intitule}</p>
+                              {slot.groupe && <p className="font-medium">{slot.groupe}</p>}
+                              {slot.enseignant_nom && <p className="text-muted-foreground">{slot.enseignant_nom}</p>}
+                              {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
+                            </div>
+                          )}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
     </div>
   )

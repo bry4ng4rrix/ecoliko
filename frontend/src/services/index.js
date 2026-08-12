@@ -33,6 +33,12 @@ export const documentEtudiantService = createResourceService("/documents-etudian
 
 export { authService } from "./authService"
 
+/** Importe les jours fériés de Madagascar (source externe) sur la période de l'année scolaire active. */
+export async function synchroniserJoursFeries() {
+  const { data } = await apiClient.post("/evenements-calendrier/synchroniser-jours-feries/")
+  return data
+}
+
 /** Calcule (ou recalcule) le bulletin d'un étudiant. `trimestre` omis/null = bulletin annuel. */
 export async function genererBulletin({ etudiant, annee_scolaire, trimestre }) {
   const { data } = await apiClient.post("/bulletins/generer/", { etudiant, annee_scolaire, trimestre })

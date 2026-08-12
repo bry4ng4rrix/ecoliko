@@ -1636,6 +1636,7 @@ class EvenementCalendrier(models.Model):
         EXAMEN = 'EXAMEN', _('Examen')
         EVENEMENT = 'EVENEMENT', _('Événement')
         REUNION = 'REUNION', _('Réunion')
+        JOUR_FERIE = 'JOUR_FERIE', _('Jour férié')
 
     ecole = models.ForeignKey(
         Ecole, on_delete=models.CASCADE, related_name='evenements_calendrier', verbose_name=_('établissement')
@@ -1645,6 +1646,11 @@ class EvenementCalendrier(models.Model):
     date_debut = models.DateField(_('date de début'))
     date_fin = models.DateField(_('date de fin'))
     description = models.TextField(_('description'), blank=True, null=True)
+    source_externe = models.CharField(
+        _('identifiant externe'), max_length=255, blank=True, null=True,
+        help_text=_("UID de l'événement dans la source externe (ex: calendrier des jours fériés), "
+                    "utilisé pour éviter les doublons lors des resynchronisations."),
+    )
     cree_par = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name='evenements_calendrier_crees',
         verbose_name=_('créé par')
@@ -1655,6 +1661,7 @@ class EvenementCalendrier(models.Model):
         verbose_name = _('événement de calendrier')
         verbose_name_plural = _('événements de calendrier')
         ordering = ['date_debut']
+        unique_together = ['ecole', 'source_externe']
 
     def __str__(self):
         return f"{self.get_type_evenement_display()} - {self.titre} ({self.date_debut})"

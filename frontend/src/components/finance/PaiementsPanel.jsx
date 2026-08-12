@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, CheckCircle, AlertCircle, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAnneeActive } from '@/hooks/useAnneeActive'
 import { useCreateResource, useResourceList } from '@/hooks/useResource'
-import { etudiantService, fetchSyntheseFinanciere, paiementService } from '@/services'
+import { classeService, etudiantService, fetchSyntheseFinanciere, paiementService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { DataTable } from '@/components/ui/data-table'
 
 const STATUT_LABELS = { PAYE: 'Payé', PARTIEL: 'Partiel', EN_ATTENTE: 'En attente', ANNULE: 'Annulé', EN_RETARD: 'En retard' }
 const STATUT_COLORS = {
@@ -24,6 +25,7 @@ export function PaiementsPanel() {
   const anneeActive = useAnneeActive()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [filtreClasse, setFiltreClasse] = useState('')
 
   const { data: synthese, isLoading: loadingSynthese } = useQuery({
     queryKey: ['synthese-financiere', anneeActive?.id],
@@ -31,6 +33,7 @@ export function PaiementsPanel() {
     enabled: Boolean(anneeActive?.id),
   })
   const { data: etudiants } = useResourceList('etudiants', etudiantService)
+  const { data: classes } = useResourceList('classes', classeService)
   const { data: paiements, isLoading: loadingPaiements } = useResourceList('paiements', paiementService)
   const createPaiement = useCreateResource('paiements', paiementService)
 
@@ -58,7 +61,49 @@ export function PaiementsPanel() {
     }
   }
 
-  const recents = [...(paiements ?? [])].sort((a, b) => b.date_paiement.localeCompare(a.date_paiement)).slice(0, 15)
+  const etudiantParId = useMemo(() => {
+    const map = new Map()
+    for (const e of etudiants ?? []) map.set(e.id, e)
+    return map
+  }, [etudiants])
+
+  const lignesEnrichies = useMemo(() => {
+    const tries = [...(paiements ?? [])].sort((a, b) => b.date_paiement.localeCompare(a.date_paiement))
+    return tries.map((p) => {
+      const etu = etudiantParId.get(p.etudiant)
+      return {
+        ...p,
+        matricule: etu?.matricule ?? '',
+        classe_actuelle: etu?.classe_actuelle ?? '',
+        nom_complet: etu ? `${etu.prenom} ${etu.nom}` : p.etudiant_nom,
+      }
+    })
+  }, [paiements, etudiantParId])
+
+  const lignesFiltrees = filtreClasse
+    ? lignesEnrichies.filter((l) => l.classe_actuelle === filtreClasse)
+    : lignesEnrichies
+
+  const columns = useMemo(() => [
+    { accessorKey: 'nom_complet', header: 'Élève' },
+    { accessorKey: 'matricule', header: 'Matricule', cell: ({ row }) => <span className="font-mono text-xs">{row.original.matricule || '—'}</span> },
+    { accessorKey: 'classe_actuelle', header: 'Classe', cell: ({ row }) => row.original.classe_actuelle || '—' },
+    {
+      accessorKey: 'montant', header: 'Montant',
+      cell: ({ row }) => `${Number(row.original.montant).toLocaleString('fr-FR')} Ar`,
+    },
+    { accessorKey: 'date_paiement', header: 'Date' },
+    { accessorKey: 'mode_paiement', header: 'Mode' },
+    {
+      accessorKey: 'statut', header: 'Statut', enableSorting: false,
+      cell: ({ row }) => (
+        <span className={`text-xs px-2 py-1 rounded font-medium ${STATUT_COLORS[row.original.statut]}`}>
+          {STATUT_LABELS[row.original.statut]}
+        </span>
+      ),
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [])
 
   return (
     <div className="space-y-6">
@@ -116,13 +161,22 @@ export function PaiementsPanel() {
       </div>
 
       <div className="bg-card rounded-lg border border-border p-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
           <h2 className="text-xl font-bold">Paiements</h2>
-          {!showForm && (
-            <Button size="sm" className="gap-2" onClick={() => setShowForm(true)}>
-              <Plus className="w-4 h-4" /> Enregistrer un paiement
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={filtreClasse} onChange={(e) => setFiltreClasse(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-background border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Toutes les classes</option>
+              {(classes ?? []).map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}
+            </select>
+            {!showForm && (
+              <Button size="sm" className="gap-2" onClick={() => setShowForm(true)}>
+                <Plus className="w-4 h-4" /> Enregistrer un paiement
+              </Button>
+            )}
+          </div>
         </div>
 
         {showForm && (
@@ -189,40 +243,10 @@ export function PaiementsPanel() {
           </form>
         )}
 
-        {loadingPaiements && <p className="text-sm text-muted-foreground">Chargement...</p>}
-        {!loadingPaiements && recents.length === 0 && (
-          <p className="text-sm text-muted-foreground">Aucun paiement enregistré.</p>
-        )}
-        {recents.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted border-b border-border">
-                <tr>
-                  <th className="px-4 py-2 text-left">Élève</th>
-                  <th className="px-4 py-2 text-left">Montant</th>
-                  <th className="px-4 py-2 text-left">Date</th>
-                  <th className="px-4 py-2 text-left">Mode</th>
-                  <th className="px-4 py-2 text-center">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {recents.map((p) => (
-                  <tr key={p.id} className="hover:bg-muted/50">
-                    <td className="px-4 py-3">{p.etudiant_nom}</td>
-                    <td className="px-4 py-3">{Number(p.montant).toLocaleString()} Ar</td>
-                    <td className="px-4 py-3">{p.date_paiement}</td>
-                    <td className="px-4 py-3">{p.mode_paiement}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`text-xs px-2 py-1 rounded font-medium ${STATUT_COLORS[p.statut]}`}>
-                        {STATUT_LABELS[p.statut]}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={columns} data={lignesFiltrees} isLoading={loadingPaiements}
+          searchPlaceholder="Rechercher par nom, matricule..." emptyMessage="Aucun paiement enregistré."
+        />
       </div>
     </div>
   )

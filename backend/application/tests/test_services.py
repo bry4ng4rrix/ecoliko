@@ -1,9 +1,11 @@
+from datetime import date
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase
 
-from application.models import User
-from application.services import moyenne, scoping
+from application.models import Classe, Matiere, User
+from application.services import jours_feries, moyenne, scoping
 from . import factories as f
 
 
@@ -142,6 +144,29 @@ class ScopingTests(TestCase):
         self.assertIn(classe, resultat)
         self.assertNotIn(autre_classe, resultat)
 
+    def test_classe_sans_niveau_filiere_ne_matche_pas_via_matiere_sans_niveau_filiere(self):
+        """Une matière sans filière/niveau (ex: catalogue créé sans ces champs) ne doit pas
+
+        être traitée comme un joker donnant accès à toutes les classes elles-mêmes sans
+        filière/niveau — seule l'affectation directe (`Classe.enseignants`) doit compter.
+        Régression : le couple (None, None) matchait `Q(filiere_id=None, niveau_id=None)`.
+        """
+        annee = f.make_annee_scolaire()
+        classe_affectee = Classe.objects.create(annee_scolaire=annee, niveau=None, filiere=None, nom='Classe A')
+        autre_classe = Classe.objects.create(annee_scolaire=annee, niveau=None, filiere=None, nom='Classe B')
+
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=annee.ecole)
+        Matiere.objects.create(
+            ecole=annee.ecole, code='MATX', intitule='Matière sans niveau', filiere=None, niveau=None,
+            enseignant=prof,
+        )
+        classe_affectee.enseignants.add(prof)
+
+        resultat = list(scoping.classes_du_professeur(prof))
+
+        self.assertIn(classe_affectee, resultat)
+        self.assertNotIn(autre_classe, resultat)
+
     def test_etudiants_du_professeur_includes_students_from_direct_classe_assignment(self):
         classe = f.make_classe()
         prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
@@ -155,3 +180,82 @@ class ScopingTests(TestCase):
 
         self.assertIn(etudiant_du_prof, resultat)
         self.assertNotIn(etudiant_ailleurs, resultat)
+
+
+class JoursFeriesParsingTests(TestCase):
+    def test_parser_evenements_ics_extracts_date_titre_uid(self):
+        texte = (
+            "BEGIN:VCALENDAR\n"
+            "BEGIN:VEVENT\n"
+            "DTSTART;VALUE=DATE:20260815\n"
+            "DTEND;VALUE=DATE:20260816\n"
+            "UID:20260815_abc123@google.com\n"
+            "SUMMARY:Assumption of Mary\n"
+            "END:VEVENT\n"
+            "BEGIN:VEVENT\n"
+            "DTSTART;VALUE=DATE:20260626\n"
+            "UID:20260626_def456@google.com\n"
+            "SUMMARY:Independence Day\n"
+            "END:VEVENT\n"
+            "END:VCALENDAR\n"
+        )
+        evenements = jours_feries._parser_evenements_ics(texte)
+        self.assertEqual(len(evenements), 2)
+        self.assertEqual(evenements[0]['date'], date(2026, 8, 15))
+        self.assertEqual(evenements[0]['uid'], '20260815_abc123@google.com')
+        self.assertEqual(evenements[0]['titre'], 'Assumption of Mary')
+        self.assertEqual(evenements[1]['titre'], 'Independence Day')
+
+    def test_deplier_lignes_recolle_les_lignes_continuees(self):
+        # RFC 5545 : l'espace en tête de ligne de continuation est le marqueur de « fold »
+        # lui-même, pas un caractère de contenu — il est donc supprimé, pas réinséré.
+        texte = "SUMMARY:Une fête très\n longue sur deux lignes\nUID:xyz"
+        lignes = jours_feries._deplier_lignes(texte)
+        self.assertIn('SUMMARY:Une fête trèslongue sur deux lignes', lignes)
+
+    def test_recuperer_jours_feries_madagascar_filtre_par_intervalle(self):
+        texte_ics = (
+            "BEGIN:VCALENDAR\n"
+            "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20250101\nUID:u1\nSUMMARY:New Year's Day\nEND:VEVENT\n"
+            "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20260815\nUID:u2\nSUMMARY:Assumption\nEND:VEVENT\n"
+            "END:VCALENDAR\n"
+        )
+        mock_reponse = MagicMock()
+        mock_reponse.read.return_value = texte_ics.encode('utf-8')
+        mock_reponse.__enter__.return_value = mock_reponse
+
+        with patch('application.services.jours_feries.urllib.request.urlopen', return_value=mock_reponse):
+            resultat = jours_feries.recuperer_jours_feries_madagascar(date(2026, 8, 1), date(2026, 8, 31))
+
+        self.assertEqual(len(resultat), 1)
+        self.assertEqual(resultat[0]['titre'], 'Assumption')
+
+    def test_recuperer_jours_feries_traduit_les_intitules_connus_en_francais(self):
+        texte_ics = (
+            "BEGIN:VCALENDAR\n"
+            "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20270101\nUID:u1\nSUMMARY:New Year's Day\nEND:VEVENT\n"
+            "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20270101\nUID:u2\nSUMMARY:Independence Day\nEND:VEVENT\n"
+            "BEGIN:VEVENT\nDTSTART;VALUE=DATE:20270101\nUID:u3\nSUMMARY:Terme inconnu\nEND:VEVENT\n"
+            "END:VCALENDAR\n"
+        )
+        mock_reponse = MagicMock()
+        mock_reponse.read.return_value = texte_ics.encode('utf-8')
+        mock_reponse.__enter__.return_value = mock_reponse
+
+        with patch('application.services.jours_feries.urllib.request.urlopen', return_value=mock_reponse):
+            resultat = jours_feries.recuperer_jours_feries_madagascar(date(2027, 1, 1), date(2027, 1, 1))
+
+        titres = {e['titre'] for e in resultat}
+        self.assertIn("Jour de l'An", titres)
+        self.assertIn("Fête de l'Indépendance", titres)
+        # Un intitulé non répertorié dans la table de traduction est laissé tel quel plutôt
+        # que d'être supprimé ou de faire planter la synchronisation.
+        self.assertIn('Terme inconnu', titres)
+
+    def test_recuperer_jours_feries_leve_erreur_metier_si_source_injoignable(self):
+        with patch(
+            'application.services.jours_feries.urllib.request.urlopen',
+            side_effect=jours_feries.urllib.error.URLError('DNS failure'),
+        ):
+            with self.assertRaises(jours_feries.ErreurRecuperationJoursFeries):
+                jours_feries.recuperer_jours_feries_madagascar(date(2026, 8, 1), date(2026, 8, 31))

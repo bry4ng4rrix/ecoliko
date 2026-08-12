@@ -15,6 +15,13 @@ def classes_du_professeur(user: User) -> QuerySet:
 
     query = Q(pk__in=user.classes_enseignees.values('pk'))
     for filiere_id, niveau_id in pairs:
+        # Une matière sans filière/niveau renseigné ne représente aucun périmètre précis :
+        # un couple (None, None) ne doit pas être traité comme un joker correspondant à
+        # toutes les classes elles-mêmes sans filière/niveau (cf. classes créées sans ces
+        # champs, ex: "Label de test") — seule l'affectation directe (`Classe.enseignants`)
+        # doit alors donner accès.
+        if filiere_id is None and niveau_id is None:
+            continue
         query |= Q(filiere_id=filiere_id, niveau_id=niveau_id)
 
     return Classe.objects.filter(query).distinct()
