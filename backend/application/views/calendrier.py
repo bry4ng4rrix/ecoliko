@@ -1,22 +1,45 @@
+from django.db.models import Q
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import EvenementCalendrier
+from ..models import EvenementCalendrier, User
 from ..permissions import EcoleScopedQuerysetMixin, ReadOnlyOrAdminOrSecretariat
 from ..serializers import EvenementCalendrierSerializer
+from ..services import scoping
 from ..services.jours_feries import ErreurRecuperationJoursFeries, recuperer_jours_feries_madagascar
 
 
 class EvenementCalendrierViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
     """Vacances, examens, événements et réunions affichés en plus des cours.
 
-    Lecture ouverte à tout le monde dans l'établissement ; écriture réservée à l'admin/bureau.
+    Lecture ouverte à tout le monde dans l'établissement (événements sans classe) ; un
+    événement rattaché à une classe (ex: échéance de devoir) n'est visible que par cette
+    classe (étudiant/parent) ou l'enseignant qui l'enseigne. Écriture réservée à l'admin/bureau.
     """
     queryset = EvenementCalendrier.objects.all()
     serializer_class = EvenementCalendrierSerializer
     permission_classes = [permissions.IsAuthenticated, ReadOnlyOrAdminOrSecretariat]
     ecole_field = 'ecole_id'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+
+        role = getattr(user, 'role', None)
+        if role == User.Role.ETUDIANT:
+            return qs.filter(Q(classe__isnull=True) | Q(classe__inscriptions__etudiant__utilisateur=user)).distinct()
+        if role == User.Role.PARENT:
+            return qs.filter(
+                Q(classe__isnull=True) | Q(classe__inscriptions__etudiant__tuteurs__parent=user)
+            ).distinct()
+        if role == User.Role.ENSEIGNANT:
+            return qs.filter(
+                Q(classe__isnull=True) | Q(classe__in=scoping.classes_du_professeur(user))
+            ).distinct()
+        return qs  # ADMIN / RESPONSABLE / SECRETARIAT
 
     @action(detail=False, methods=['post'], url_path='synchroniser-jours-feries')
     def synchroniser_jours_feries(self, request):

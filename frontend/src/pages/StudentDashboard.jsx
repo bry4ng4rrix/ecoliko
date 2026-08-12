@@ -14,7 +14,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAnneeActive } from '@/hooks/useAnneeActive'
 import { useCreateResource, useResourceList } from '@/hooks/useResource'
 import {
-  bulletinService, classeService, demandeDocumentService, emploiDuTempsService,
+  bulletinService, cahierTexteService, classeService, demandeDocumentService, emploiDuTempsService,
   etudiantService, fetchDossierFinancier, fetchMoyenneTrimestre, fraisScolariteService, matiereService,
   noteService, paiementService, presenceService,
   soumettreJustification, telechargerBulletinPdf, telechargerDocumentPdf, trimestreService,
@@ -53,6 +53,7 @@ function StudentDashboard() {
     { id: 'profil', label: 'Mon Profil', icon: User },
     { id: 'academique', label: 'Gestion Académique', icon: BookOpen },
     { id: 'edt', label: 'Emploi du Temps', icon: Calendar },
+    { id: 'devoirs', label: 'Devoirs', icon: FileText },
     { id: 'notes', label: 'Notes & Résultats', icon: BarChart3 },
     { id: 'presence', label: 'Présence', icon: Clock },
     { id: 'admin', label: 'Gestion Administrative', icon: FileText },
@@ -132,6 +133,7 @@ function StudentDashboard() {
             {activeTab === 'profil' && <StudentProfile />}
             {activeTab === 'academique' && <AcademicManagement />}
             {activeTab === 'edt' && <StudentEmploiDuTemps />}
+            {activeTab === 'devoirs' && <StudentDevoirs />}
             {activeTab === 'notes' && <GradesResults />}
             {activeTab === 'presence' && <AttendanceTracking />}
             {activeTab === 'admin' && <AdministrativeStatus />}
@@ -406,6 +408,73 @@ function StudentEmploiDuTemps() {
             </tbody>
           </table>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ============ DEVOIRS ============
+function StudentDevoirs() {
+  const { data: entrees, isLoading } = useResourceList('cahier-textes', cahierTexteService)
+
+  const aujourdhui = new Date().toISOString().slice(0, 10)
+  const devoirs = (entrees ?? [])
+    .filter((e) => e.travail_a_faire)
+    .sort((a, b) => `${a.date_echeance_travail ?? ''}${a.heure_echeance_travail ?? ''}`.localeCompare(
+      `${b.date_echeance_travail ?? ''}${b.heure_echeance_travail ?? ''}`
+    ))
+
+  const statutDevoir = (d) => {
+    if (!d.date_echeance_travail) return { label: 'Sans échéance', classe: 'bg-muted text-muted-foreground' }
+    if (d.date_echeance_travail < aujourdhui) return { label: 'En retard', classe: 'bg-red-500/20 text-red-700' }
+    if (d.date_echeance_travail === aujourdhui) return { label: "Pour aujourd'hui", classe: 'bg-orange-500/20 text-orange-700' }
+    const dansTroisJours = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    if (d.date_echeance_travail <= dansTroisJours) return { label: 'Bientôt', classe: 'bg-amber-500/20 text-amber-700' }
+    return { label: 'À venir', classe: 'bg-green-500/20 text-green-700' }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">Devoirs</h1>
+        <p className="text-muted-foreground mt-1">Travail à faire pour votre classe</p>
+      </div>
+
+      <div className="space-y-3">
+        {isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
+        {!isLoading && devoirs.length === 0 && (
+          <p className="text-sm text-muted-foreground">Aucun devoir pour le moment.</p>
+        )}
+        {devoirs.map((d) => {
+          const statut = statutDevoir(d)
+          return (
+            <div key={d.id} className="bg-card rounded-lg border border-border p-4">
+              <div className="flex justify-between items-start gap-3 mb-1">
+                <p className="font-semibold">{d.matiere_intitule}</p>
+                <span className={`text-xs px-2 py-1 rounded font-medium flex-shrink-0 ${statut.classe}`}>{statut.label}</span>
+              </div>
+              <p className="text-sm text-muted-foreground">{d.travail_a_faire}</p>
+              <p className="text-xs text-muted-foreground mt-2">
+                À rendre le {d.date_echeance_travail}
+                {d.heure_echeance_travail && ` à ${d.heure_echeance_travail.slice(0, 5)}`}
+              </p>
+              {(d.piece_jointe || d.lien) && (
+                <div className="flex gap-3 mt-2">
+                  {d.piece_jointe && (
+                    <a href={d.piece_jointe} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                      Pièce jointe
+                    </a>
+                  )}
+                  {d.lien && (
+                    <a href={d.lien} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">
+                      Lien
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

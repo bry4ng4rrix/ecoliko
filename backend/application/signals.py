@@ -15,6 +15,7 @@ from .models import (
     PaiementEcolage, PresenceCours,
 )
 from .services import audit as audit_service
+from .services import devoirs as devoirs_service
 from .services import notifications as notif_service
 
 
@@ -95,6 +96,7 @@ def on_message_created(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=CahierTexte)
 def on_cahier_texte_created(sender, instance, created, **kwargs):
+    devoirs_service.synchroniser_evenement_calendrier(instance)
     if created:
         notif_service.notifier_nouveau_devoir(instance)
 

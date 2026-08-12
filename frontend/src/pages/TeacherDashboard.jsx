@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { CahierTextePanel } from '@/components/pedagogie/CahierTextePanel'
+import { DevoirsPanel } from '@/components/pedagogie/DevoirsPanel'
 import { DisciplinePanel } from '@/components/discipline/DisciplinePanel'
 
 function TeacherDashboard() {
@@ -42,6 +43,7 @@ function TeacherDashboard() {
     { id: 'academique', label: 'Gestion Académique', icon: BookOpen },
     { id: 'emploi-du-temps', label: 'Emploi du Temps', icon: Calendar },
     { id: 'notes', label: 'Notes & Évaluations', icon: BarChart3 },
+    { id: 'devoirs', label: 'Devoirs', icon: Send },
     { id: 'cahier', label: 'Cahier de textes', icon: FileText },
     { id: 'presence', label: 'Présence & Absences', icon: Clock },
     { id: 'communication', label: 'Communication', icon: MessageSquare },
@@ -122,6 +124,7 @@ function TeacherDashboard() {
             {activeTab === 'academique' && <AcademicManagement />}
             {activeTab === 'emploi-du-temps' && <MonEmploiDuTempsPanel />}
             {activeTab === 'notes' && <GradesEvaluation />}
+            {activeTab === 'devoirs' && <DevoirsPanel />}
             {activeTab === 'cahier' && <CahierTexteTab />}
             {activeTab === 'presence' && <AttendanceAbsence />}
             {activeTab === 'communication' && <Communication />}
@@ -267,19 +270,23 @@ function AcademicManagement() {
 }
 
 // ============ MY TIMETABLE ============
-const JOURS_ORDRE = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM']
+const JOURS_SEMAINE = [
+  { code: 'LUN', label: 'Lundi' }, { code: 'MAR', label: 'Mardi' }, { code: 'MER', label: 'Mercredi' },
+  { code: 'JEU', label: 'Jeudi' }, { code: 'VEN', label: 'Vendredi' }, { code: 'SAM', label: 'Samedi' },
+]
 
 function MonEmploiDuTempsPanel() {
   const { data: emploiDuTemps, isLoading } = useResourceList('emplois-du-temps', emploiDuTempsService)
 
-  const joursAvecCreneaux = JOURS_ORDRE
-    .map((jour) => ({
-      jour,
-      slots: (emploiDuTemps ?? [])
-        .filter((s) => s.jour === jour)
-        .sort((a, b) => a.heure_debut.localeCompare(b.heure_debut)),
-    }))
-    .filter(({ slots }) => slots.length > 0)
+  const creneaux = [...new Set((emploiDuTemps ?? []).map((s) => `${s.heure_debut}|${s.heure_fin}`))]
+    .sort()
+    .map((cle) => {
+      const [heure_debut, heure_fin] = cle.split('|')
+      return { heure_debut, heure_fin }
+    })
+
+  const slotAt = (jour, heure_debut) =>
+    (emploiDuTemps ?? []).find((s) => s.jour === jour && s.heure_debut === heure_debut)
 
   return (
     <div className="space-y-6">
@@ -288,30 +295,49 @@ function MonEmploiDuTempsPanel() {
         <p className="text-muted-foreground mt-1">Votre planning hebdomadaire de cours</p>
       </div>
 
-      {isLoading && <p className="text-sm text-muted-foreground">Chargement...</p>}
-      {!isLoading && joursAvecCreneaux.length === 0 && (
-        <p className="text-sm text-muted-foreground">Aucun créneau enregistré pour l'instant.</p>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {joursAvecCreneaux.map(({ jour, slots }) => (
-          <div key={jour} className="bg-card rounded-lg border border-border p-6">
-            <h2 className="text-lg font-bold mb-4">{JOUR_LABELS[jour]}</h2>
-            <div className="space-y-3">
-              {slots.map((slot) => (
-                <div key={slot.id} className="p-3 bg-muted rounded-lg">
-                  <p className="font-semibold text-sm">{slot.heure_debut}–{slot.heure_fin}</p>
-                  <p className="text-sm text-muted-foreground">{slot.matiere_intitule} — {slot.classe_nom}</p>
-                  {slot.salle_nom && (
-                    <span className="inline-block mt-1 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full font-medium">
-                      {slot.salle_nom}
-                    </span>
-                  )}
-                </div>
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
+        {isLoading && <p className="p-6 text-sm text-muted-foreground">Chargement...</p>}
+        {!isLoading && creneaux.length === 0 && (
+          <p className="p-6 text-sm text-muted-foreground">Aucun créneau enregistré pour l'instant.</p>
+        )}
+        {!isLoading && creneaux.length > 0 && (
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted">
+                <th className="px-3 py-3 text-left font-semibold border border-border w-24">Horaire</th>
+                {JOURS_SEMAINE.map((j) => (
+                  <th key={j.code} className="px-3 py-3 text-center font-semibold border border-border">{j.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {creneaux.map(({ heure_debut, heure_fin }) => (
+                <tr key={heure_debut}>
+                  <td className="px-3 py-2 border border-border text-xs font-medium text-muted-foreground whitespace-nowrap align-top">
+                    {heure_debut.slice(0, 5)}–{heure_fin.slice(0, 5)}
+                  </td>
+                  {JOURS_SEMAINE.map((jour) => {
+                    const slot = slotAt(jour.code, heure_debut)
+                    return (
+                      <td key={jour.code} className="border border-border p-1 align-top min-w-[140px]">
+                        {slot && (
+                          <div
+                            className="rounded-lg p-2 text-xs h-full"
+                            style={{ backgroundColor: `${slot.matiere_couleur ?? '#6366f1'}22` }}
+                          >
+                            <p className="font-semibold">{slot.matiere_intitule}</p>
+                            <p className="text-muted-foreground">{slot.classe_nom}</p>
+                            {slot.salle_nom && <p className="text-muted-foreground">{slot.salle_nom}</p>}
+                          </div>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
               ))}
-            </div>
-          </div>
-        ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

@@ -431,3 +431,89 @@ class ClasseSectionAndMatiereCouleurTests(APITestCase):
         self.client.force_authenticate(user=admin)
         response = self.client.get(f'/api/matieres/{matiere.id}/')
         self.assertEqual(response.data['couleur'], '#6366f1')
+
+
+class RappelsDevoirsTests(APITestCase):
+    def _devoir_echeance_dans(self, jours, classe=None, matiere=None):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from application.models import CahierTexte
+
+        classe = classe or f.make_classe()
+        matiere = matiere or f.make_matiere(filiere=classe.filiere, niveau=classe.niveau)
+        return CahierTexte.objects.create(
+            classe=classe, matiere=matiere, date_seance=timezone.localdate(),
+            travail_a_faire='À rendre.', date_echeance_travail=timezone.localdate() + timedelta(days=jours),
+        )
+
+    def test_service_envoie_un_rappel_et_est_idempotent_le_meme_jour(self):
+        from application.models import Notification, RappelDevoirEnvoye
+        from application.services.devoirs import envoyer_rappels_devoirs
+
+        devoir = self._devoir_echeance_dans(2)
+        etudiant = f.make_etudiant(ecole=devoir.classe.annee_scolaire.ecole)
+        etudiant.utilisateur = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.save()
+        f.make_inscription(etudiant=etudiant, classe=devoir.classe)
+
+        resultat = envoyer_rappels_devoirs(jours_avant=3)
+        self.assertEqual(resultat['rappels_envoyes'], 1)
+        self.assertEqual(
+            Notification.objects.filter(
+                destinataire=etudiant.utilisateur, type_notification=Notification.Type.RAPPEL_DEVOIR
+            ).count(),
+            1,
+        )
+        self.assertEqual(RappelDevoirEnvoye.objects.count(), 1)
+
+        # Relancer le même jour ne doit pas renvoyer un second rappel.
+        resultat2 = envoyer_rappels_devoirs(jours_avant=3)
+        self.assertEqual(resultat2['rappels_envoyes'], 0)
+        self.assertEqual(
+            Notification.objects.filter(
+                destinataire=etudiant.utilisateur, type_notification=Notification.Type.RAPPEL_DEVOIR
+            ).count(),
+            1,
+        )
+
+    def test_devoir_hors_fenetre_ne_declenche_pas_de_rappel(self):
+        from application.models import Notification
+        from application.services.devoirs import envoyer_rappels_devoirs
+
+        devoir = self._devoir_echeance_dans(10)
+        etudiant = f.make_etudiant(ecole=devoir.classe.annee_scolaire.ecole)
+        etudiant.utilisateur = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.save()
+        f.make_inscription(etudiant=etudiant, classe=devoir.classe)
+
+        resultat = envoyer_rappels_devoirs(jours_avant=3)
+        self.assertEqual(resultat['rappels_envoyes'], 0)
+        self.assertFalse(Notification.objects.filter(type_notification=Notification.Type.RAPPEL_DEVOIR).exists())
+
+    def test_devoir_deja_passe_ne_declenche_pas_de_rappel(self):
+        from application.models import Notification
+        from application.services.devoirs import envoyer_rappels_devoirs
+
+        devoir = self._devoir_echeance_dans(-1)
+        etudiant = f.make_etudiant(ecole=devoir.classe.annee_scolaire.ecole)
+        etudiant.utilisateur = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.save()
+        f.make_inscription(etudiant=etudiant, classe=devoir.classe)
+
+        resultat = envoyer_rappels_devoirs(jours_avant=3)
+        self.assertEqual(resultat['rappels_envoyes'], 0)
+        self.assertFalse(Notification.objects.filter(type_notification=Notification.Type.RAPPEL_DEVOIR).exists())
+
+    def test_enseignant_peut_declencher_manuellement(self):
+        prof = f.make_user(role=User.Role.ENSEIGNANT)
+        self.client.force_authenticate(user=prof)
+        response = self.client.post('/api/cahier-textes/envoyer-rappels/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+    def test_etudiant_ne_peut_pas_declencher_manuellement(self):
+        etudiant = f.make_user(role=User.Role.ETUDIANT)
+        self.client.force_authenticate(user=etudiant)
+        response = self.client.post('/api/cahier-textes/envoyer-rappels/')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

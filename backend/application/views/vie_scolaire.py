@@ -8,6 +8,7 @@ from ..permissions import (
     ReadOnlyOrAdminOrSecretariat,
 )
 from ..serializers import AppelDuJourSerializer, CahierTexteSerializer, EmploiDuTempsSerializer, PresenceCoursSerializer
+from ..services.devoirs import envoyer_rappels_devoirs
 from ..services.vie_scolaire import enregistrer_appel
 
 
@@ -128,6 +129,8 @@ class CahierTexteViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy'):
             return [permissions.IsAuthenticated(), CanManageCahierTexte()]
+        if self.action == 'envoyer_rappels':
+            return [permissions.IsAuthenticated(), IsStaffPedagogique()]
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
@@ -144,3 +147,14 @@ class CahierTexteViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         if role == User.Role.PARENT:
             return qs.filter(classe__inscriptions__etudiant__tuteurs__parent=user).distinct()
         return qs  # ADMIN / RESPONSABLE / SECRETARIAT
+
+    @action(detail=False, methods=['post'], url_path='envoyer-rappels')
+    def envoyer_rappels(self, request):
+        """Déclenche manuellement l'envoi des rappels de devoirs à échéance proche — utile en
+
+        l'absence d'un ordonnanceur système (cron) déjà configuré ; voir la commande
+        `envoyer_rappels_devoirs` pour l'automatiser réellement au quotidien.
+        """
+        jours_avant = int(request.data.get('jours_avant', 3))
+        resultat = envoyer_rappels_devoirs(jours_avant=jours_avant)
+        return Response(resultat)

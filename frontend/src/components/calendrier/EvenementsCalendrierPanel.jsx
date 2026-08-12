@@ -11,10 +11,11 @@ import { MonthCalendar, moisSuivant } from '@/components/ui/month-calendar'
 
 const TYPE_LABELS = {
   VACANCES: 'Vacances', EXAMEN: 'Examen', EVENEMENT: 'Événement', REUNION: 'Réunion', JOUR_FERIE: 'Jour férié',
+  DEVOIR: 'Devoir',
 }
 const TYPE_COLORS = {
   VACANCES: 'bg-blue-600', EXAMEN: 'bg-red-600', EVENEMENT: 'bg-purple-600', REUNION: 'bg-amber-600',
-  JOUR_FERIE: 'bg-emerald-600',
+  JOUR_FERIE: 'bg-emerald-600', DEVOIR: 'bg-teal-600',
 }
 
 const EMPTY_FORM = { titre: '', type_evenement: 'EVENEMENT', date_debut: '', date_fin: '', description: '' }
@@ -98,7 +99,8 @@ export function EvenementsCalendrierPanel() {
     let garde = 0
     while (jour <= ev.date_fin && garde < 366) {
       events.push({
-        date: jour, label: `${TYPE_LABELS[ev.type_evenement]} — ${ev.titre}`,
+        date: jour,
+        label: `${TYPE_LABELS[ev.type_evenement]} — ${ev.titre}${ev.classe_nom ? ` (${ev.classe_nom})` : ''}`,
         color: TYPE_COLORS[ev.type_evenement] ?? 'bg-gray-500', title: ev.description || ev.titre,
         id: ev.id, ev,
       })

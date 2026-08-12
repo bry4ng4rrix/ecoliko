@@ -39,6 +39,12 @@ export async function synchroniserJoursFeries() {
   return data
 }
 
+/** Déclenche l'envoi immédiat des rappels de devoirs à échéance proche (à défaut de cron configuré). */
+export async function envoyerRappelsDevoirs(joursAvant = 3) {
+  const { data } = await apiClient.post("/cahier-textes/envoyer-rappels/", { jours_avant: joursAvant })
+  return data
+}
+
 /** Calcule (ou recalcule) le bulletin d'un étudiant. `trimestre` omis/null = bulletin annuel. */
 export async function genererBulletin({ etudiant, annee_scolaire, trimestre }) {
   const { data } = await apiClient.post("/bulletins/generer/", { etudiant, annee_scolaire, trimestre })

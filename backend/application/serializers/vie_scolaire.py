@@ -70,7 +70,7 @@ class CahierTexteSerializer(ValidatedModelSerializer):
         model = CahierTexte
         fields = (
             'id', 'classe', 'classe_nom', 'matiere', 'matiere_intitule', 'enseignant', 'enseignant_nom',
-            'date_seance', 'contenu_seance', 'travail_a_faire', 'date_echeance_travail',
+            'date_seance', 'contenu_seance', 'travail_a_faire', 'date_echeance_travail', 'heure_echeance_travail',
             'piece_jointe', 'lien', 'date_creation',
         )
         read_only_fields = ('enseignant', 'date_creation')

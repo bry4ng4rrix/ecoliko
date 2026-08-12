@@ -1191,6 +1191,7 @@ class Notification(models.Model):
         ANNONCE = 'ANNONCE', _('Nouvelle annonce')
         MESSAGE = 'MESSAGE', _('Nouveau message')
         DEVOIR = 'DEVOIR', _('Nouveau devoir')
+        RAPPEL_DEVOIR = 'RAPPEL_DEVOIR', _('Rappel de devoir')
         DISCIPLINE = 'DISCIPLINE', _('Événement disciplinaire')
 
     destinataire = models.ForeignKey(
@@ -1470,9 +1471,13 @@ class CahierTexte(models.Model):
         verbose_name=_('enseignant')
     )
     date_seance = models.DateField(_('date de la séance'), default=timezone.localdate)
-    contenu_seance = models.TextField(_('contenu de la séance'), help_text=_('Ce qui a été fait en cours.'))
+    contenu_seance = models.TextField(
+        _('contenu de la séance'), blank=True,
+        help_text=_('Ce qui a été fait en cours (facultatif pour un devoir envoyé hors séance).'),
+    )
     travail_a_faire = models.TextField(_('travail à faire'), blank=True, null=True)
     date_echeance_travail = models.DateField(_("date d'échéance du travail"), blank=True, null=True)
+    heure_echeance_travail = models.TimeField(_("heure d'échéance du travail"), blank=True, null=True)
     piece_jointe = models.FileField(
         _('pièce jointe'), upload_to='cahier_textes/', blank=True, null=True,
         help_text=_('PDF, image, ou tout autre document lié à la séance.'),
@@ -1491,6 +1496,27 @@ class CahierTexte(models.Model):
     def clean(self):
         if self.classe_id and self.matiere_id and self.classe.annee_scolaire.ecole_id != self.matiere.ecole_id:
             raise ValidationError(_("La classe et la matière doivent appartenir au même établissement."))
+
+
+class RappelDevoirEnvoye(models.Model):
+    """Traçabilité des rappels de devoir déjà envoyés à un destinataire un jour donné —
+
+    évite de renvoyer plusieurs fois le même rappel le même jour si la commande de
+    rappels quotidiens (`envoyer_rappels_devoirs`) est exécutée plusieurs fois.
+    """
+    cahier_texte = models.ForeignKey(
+        CahierTexte, on_delete=models.CASCADE, related_name='rappels_envoyes', verbose_name=_('devoir')
+    )
+    destinataire = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_('destinataire'))
+    date_envoi = models.DateField(_("date d'envoi"), default=timezone.localdate)
+
+    class Meta:
+        verbose_name = _('rappel de devoir envoyé')
+        verbose_name_plural = _('rappels de devoir envoyés')
+        unique_together = ['cahier_texte', 'destinataire', 'date_envoi']
+
+    def __str__(self):
+        return f"Rappel {self.cahier_texte_id} -> {self.destinataire_id} ({self.date_envoi})"
 
 
 class EvenementDisciplinaire(models.Model):
@@ -1637,9 +1663,16 @@ class EvenementCalendrier(models.Model):
         EVENEMENT = 'EVENEMENT', _('Événement')
         REUNION = 'REUNION', _('Réunion')
         JOUR_FERIE = 'JOUR_FERIE', _('Jour férié')
+        DEVOIR = 'DEVOIR', _('Devoir')
 
     ecole = models.ForeignKey(
         Ecole, on_delete=models.CASCADE, related_name='evenements_calendrier', verbose_name=_('établissement')
+    )
+    classe = models.ForeignKey(
+        'Classe', on_delete=models.CASCADE, null=True, blank=True, related_name='evenements_calendrier',
+        verbose_name=_('classe'),
+        help_text=_("Laisser vide pour un événement concernant tout l'établissement ; renseigner pour "
+                    "un événement visible uniquement par cette classe (ex: échéance de devoir)."),
     )
     titre = models.CharField(_('titre'), max_length=150)
     type_evenement = models.CharField(_("type d'événement"), max_length=10, choices=TypeEvenement.choices)
@@ -1650,6 +1683,11 @@ class EvenementCalendrier(models.Model):
         _('identifiant externe'), max_length=255, blank=True, null=True,
         help_text=_("UID de l'événement dans la source externe (ex: calendrier des jours fériés), "
                     "utilisé pour éviter les doublons lors des resynchronisations."),
+    )
+    cahier_texte = models.OneToOneField(
+        'CahierTexte', on_delete=models.CASCADE, null=True, blank=True, related_name='evenement_calendrier',
+        verbose_name=_('devoir lié'),
+        help_text=_("Entrée de cahier de textes dont cet événement synchronise l'échéance de devoir."),
     )
     cree_par = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, related_name='evenements_calendrier_crees',
@@ -1669,6 +1707,8 @@ class EvenementCalendrier(models.Model):
     def clean(self):
         if self.date_debut and self.date_fin and self.date_fin < self.date_debut:
             raise ValidationError(_('La date de fin doit être postérieure ou égale à la date de début.'))
+        if self.classe_id and self.ecole_id and self.classe.annee_scolaire.ecole_id != self.ecole_id:
+            raise ValidationError(_("La classe doit appartenir au même établissement que l'événement."))
 
 
 class DocumentJustificatifEtudiant(models.Model):
