@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   LogOut, Home, Users, BookOpen, Calendar, FileText, Bell, Settings,
-  GraduationCap, UserCog, ClipboardList, DollarSign, BarChart3
+  GraduationCap, UserCog, ClipboardList, DollarSign, BarChart3, Menu, X
 } from 'lucide-react'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { NotificationBell } from '@/components/NotificationBell'
 
 function Dashboard() {
   const navigate = useNavigate()
@@ -16,10 +18,9 @@ function Dashboard() {
     email: 'responsable@lycee.mg'
   }
 
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   const handleLogout = () => {
-    // À remplacer par vraie déconnexion (clear token, etc.)
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     navigate('/login')
@@ -74,82 +75,53 @@ function Dashboard() {
   const navItems = getNavItems()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen flex overflow-hidden bg-background text-foreground">
       {/* Sidebar */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 lg:relative lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
-      >
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <GraduationCap className="w-8 h-8 text-indigo-600" />
-            <h1 className="text-xl font-bold text-indigo-700">SIG-Lycée</h1>
-          </div>
-          <p className="text-sm text-gray-500 mt-1">{user.role}</p>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col h-full flex-shrink-0`}>
+        <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
+          {sidebarOpen && <h1 className="font-bold text-lg text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-sidebar-accent rounded-lg">
+            {sidebarOpen ? <X className="w-5 h-5 text-slate-500" /> : <Menu className="w-5 h-5 text-slate-500" />}
+          </button>
         </div>
-
-        <nav className="mt-6 px-3 space-y-1">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {navItems.map((item, index) => (
             <button
               key={index}
               onClick={() => navigate(item.path)}
-              className="flex items-center gap-3 w-full px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
             >
-              <item.icon className="w-5 h-5" />
-              {item.label}
+              <item.icon className="w-5 h-5 flex-shrink-0 text-slate-500" />
+              {sidebarOpen && <span>{item.label}</span>}
             </button>
           ))}
         </nav>
-
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-200">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold">
-              {user.firstName[0]}{user.lastName[0]}
-            </div>
-            <div>
-              <p className="font-medium">{user.firstName} {user.lastName}</p>
-              <p className="text-xs text-gray-500">{user.email}</p>
-            </div>
-          </div>
-
+        <div className="p-2 border-t border-sidebar-border">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10"
           >
-            <LogOut className="w-5 h-5" />
-            Déconnexion
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            {sidebarOpen && <span>Déconnexion</span>}
           </button>
         </div>
       </aside>
 
-      {/* Overlay mobile quand sidebar ouverte */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Contenu principal */}
-      <div className="flex-1 flex flex-col">
-        {/* Header mobile */}
-        <header className="bg-white shadow-sm lg:hidden">
-          <div className="px-4 py-3 flex justify-between items-center">
-            <button onClick={() => setSidebarOpen(true)}>
-              <svg className="w-6 h-6 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <h1 className="text-lg font-bold text-indigo-700">SIG-Lycée</h1>
-            <div className="w-6 h-6" /> {/* Espace vide */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between flex-shrink-0">
+          <div>
+            <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>
+            <p className="text-xs text-muted-foreground">Portail de simulation • {user.role}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <NotificationBell />
           </div>
         </header>
 
-        {/* Contenu */}
-        <main className="flex-1 p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-6 bg-slate-50/50 dark:bg-slate-950/20">
           <div className="max-w-7xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white mb-6">
               Bienvenue, {user.firstName} {user.lastName}
             </h2>
 
@@ -205,28 +177,30 @@ function Dashboard() {
 // Composant réutilisable pour cartes
 function DashboardCard({ icon: Icon, title, value, color }) {
   const colorClasses = {
-    indigo: 'bg-indigo-100 text-indigo-700',
-    blue: 'bg-blue-100 text-blue-700',
-    green: 'bg-green-100 text-green-700',
-    red: 'bg-red-100 text-red-700',
-    purple: 'bg-purple-100 text-purple-700',
-    orange: 'bg-orange-100 text-orange-700',
-    amber: 'bg-amber-100 text-amber-700',
-    gray: 'bg-gray-100 text-gray-700',
+    indigo: 'border-indigo-100 bg-indigo-50/50 text-indigo-900 dark:border-indigo-900/30 dark:bg-indigo-950/20 dark:text-indigo-300',
+    blue: 'border-blue-100 bg-blue-50/50 text-blue-900 dark:border-blue-900/30 dark:bg-blue-950/20 dark:text-blue-300',
+    green: 'border-green-100 bg-green-50/50 text-green-900 dark:border-green-900/30 dark:bg-green-950/20 dark:text-green-300',
+    red: 'border-red-100 bg-red-50/50 text-red-900 dark:border-red-900/30 dark:bg-red-950/20 dark:text-red-300',
+    purple: 'border-purple-100 bg-purple-50/50 text-purple-900 dark:border-purple-900/30 dark:bg-purple-950/20 dark:text-purple-300',
+    orange: 'border-orange-100 bg-orange-50/50 text-orange-900 dark:border-orange-900/30 dark:bg-orange-950/20 dark:text-orange-300',
+    amber: 'border-amber-100 bg-amber-50/50 text-amber-900 dark:border-amber-900/30 dark:bg-amber-950/20 dark:text-amber-300',
+    gray: 'border-slate-100 bg-slate-50/50 text-slate-900 dark:border-slate-800 dark:bg-slate-900/20 dark:text-slate-300',
   }
 
   return (
-    <div className={`rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow ${colorClasses[color] || 'bg-gray-100 text-gray-700'}`}>
-      <div className="flex items-center gap-4">
-        <div className="p-3 rounded-lg bg-white/80">
-          <Icon className="w-6 h-6" />
+    <Card className={`border shadow-sm hover:shadow-md transition-shadow ${colorClasses[color] || 'border-slate-100 text-slate-900'}`}>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-4">
+          <div className="p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+            <Icon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{title}</p>
+            <p className="text-2xl font-extrabold mt-1">{value}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-sm font-medium opacity-80">{title}</p>
-          <p className="text-xl md:text-2xl font-bold">{value}</p>
-        </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 

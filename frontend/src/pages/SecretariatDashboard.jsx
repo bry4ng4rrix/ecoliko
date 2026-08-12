@@ -25,6 +25,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 function SecretariatDashboard() {
   const [activeTab, setActiveTab] = useState('home')
@@ -233,50 +237,57 @@ function SecretariatDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-card border-r border-border transition-all duration-300 flex flex-col`}>
-        <div className="p-4 flex items-center justify-between border-b border-border">
-          {sidebarOpen && <h1 className="font-bold text-lg">SIG-Lycée</h1>}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-muted rounded-lg">
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+    <div className="h-screen flex overflow-hidden bg-background text-foreground">
+      {/* Sidebar */}
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-sidebar border-r border-sidebar-border transition-all duration-300 flex flex-col h-full flex-shrink-0`}>
+        <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
+          {sidebarOpen && <h1 className="font-bold text-lg text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-sidebar-accent rounded-lg">
+            {sidebarOpen ? <X className="w-5 h-5 text-slate-500" /> : <Menu className="w-5 h-5 text-slate-500" />}
           </button>
         </div>
-        <nav className="flex-1 p-2 space-y-1">
+        <nav className="flex-1 p-2 space-y-1 overflow-y-auto">
           {menuItems.map(item => {
             const Icon = item.icon
+            const isSelected = activeTab === item.id
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === item.id ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  isSelected 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10' 
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                 }`}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
-                {sidebarOpen && item.label}
+                <Icon className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
+                {sidebarOpen && <span>{item.label}</span>}
               </button>
             )
           })}
         </nav>
-        <div className="p-2 border-t border-border">
+        <div className="p-2 border-t border-sidebar-border">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10"
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {sidebarOpen && 'Déconnexion'}
+            {sidebarOpen && <span>Déconnexion</span>}
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between">
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <header className="bg-card border-b border-border px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="text-sm text-muted-foreground">Bureau administratif</p>
+            <h1 className="text-xl font-bold text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>
+            <p className="text-xs text-muted-foreground">Bureau administratif • Secrétariat</p>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-3">
+            <NotificationBell />
+          </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 bg-slate-50/50 dark:bg-slate-950/20">
           {activeTab === 'home' && <Overview />}
           {activeTab === 'etudiants' && <EtudiantsList />}
           {activeTab === 'inscriptions' && <DemandesInscriptionPanel />}

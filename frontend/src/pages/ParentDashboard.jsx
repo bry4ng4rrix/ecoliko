@@ -11,6 +11,10 @@ import {
   presenceService, telechargerBulletinPdf, trimestreService,
 } from '@/services'
 import { Button } from '@/components/ui/button'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { NotificationBell } from '@/components/NotificationBell'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
@@ -55,31 +59,33 @@ function ParentDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-600">SIG-Lycée</h1>
-            <p className="text-sm text-gray-600">Espace Parent</p>
+      <header className="bg-card border-b border-border sticky top-0 z-20 flex-shrink-0">
+        <div className="flex justify-between items-center px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>
+              <p className="text-xs text-muted-foreground">Espace Parent Sécurisé</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <NotificationBell />
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-muted rounded-lg transition-colors text-sm font-medium"
             >
-              <LogOut className="w-5 h-5" />
-              Déconnexion
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </div>
         </div>
       </header>
 
-      <div className="flex h-screen overflow-hidden">
+      <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
-        <aside className="w-64 bg-white shadow-md overflow-y-auto hidden md:block">
-          <nav className="p-6 space-y-2">
+        <aside className="w-64 bg-sidebar border-r border-sidebar-border overflow-y-auto hidden md:block h-full flex-shrink-0">
+          <nav className="p-4 space-y-1">
             {[
               { id: 'home', label: 'Accueil', icon: FileText },
               { id: 'enfants', label: 'Mes Enfants', icon: TrendingUp },
@@ -90,18 +96,19 @@ function ParentDashboard() {
               { id: 'communication', label: 'Communication', icon: MessageSquare }
             ].map(item => {
               const Icon = item.icon
+              const isSelected = activeTab === item.id
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                    activeTab === item.id
-                      ? 'bg-blue-100 text-blue-600 font-semibold'
-                      : 'text-gray-700 hover:bg-gray-100'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   }`}
                 >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
+                  <span>{item.label}</span>
                 </button>
               )
             })}
@@ -109,8 +116,8 @@ function ParentDashboard() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Parent Info */}
             <div className="bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-lg p-6 mb-8 shadow-lg">
               <h2 className="text-3xl font-bold mb-2">Bienvenue, {user ? `${user.first_name} ${user.last_name}` : ''}</h2>

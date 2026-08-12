@@ -14,6 +14,10 @@ import { classeService, etudiantService } from '@/services'
 import { NotificationBell } from '@/components/NotificationBell'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 function PedagogicalCoordinatorDashboard() {
   const [activeTab, setActiveTab] = useState('home')
@@ -39,9 +43,9 @@ function PedagogicalCoordinatorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="h-screen flex flex-col overflow-hidden bg-background text-foreground">
       {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-20">
+      <header className="bg-card border-b border-border sticky top-0 z-20 flex-shrink-0">
         <div className="flex justify-between items-center px-6 py-4">
           <div className="flex items-center gap-4">
             <button
@@ -51,7 +55,7 @@ function PedagogicalCoordinatorDashboard() {
               {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-primary">SIG-Lycée</h1>
+              <h1 className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">SIG-Lycée</h1>
               <p className="text-xs text-muted-foreground">
                 {user ? `${user.first_name} ${user.last_name}` : 'Responsable Pédagogique'}
               </p>
@@ -61,34 +65,35 @@ function PedagogicalCoordinatorDashboard() {
             <NotificationBell />
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-muted rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-destructive hover:bg-muted rounded-lg transition-colors text-sm font-medium"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </div>
         </div>
       </header>
 
-      <div className="flex">
+      <div className="flex-1 flex overflow-hidden">
         {/* Sidebar */}
         <aside className={`${
           sidebarOpen ? 'w-64' : 'w-0'
-        } bg-sidebar border-r border-sidebar-border overflow-y-auto transition-all duration-300 hidden md:block fixed md:relative h-[calc(100vh-73px)]`}>
-          <nav className="p-4 space-y-2">
+        } bg-sidebar border-r border-sidebar-border overflow-y-auto transition-all duration-300 hidden md:block h-full flex-shrink-0`}>
+          <nav className="p-4 space-y-1">
             {menuItems.map(item => {
               const Icon = item.icon
+              const isSelected = activeTab === item.id
               return (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-sm font-medium ${
-                    activeTab === item.id
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-medium ${
+                    isSelected
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/10'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   }`}
                 >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-white' : 'text-slate-500'}`} />
                   <span>{item.label}</span>
                 </button>
               )
@@ -97,7 +102,7 @@ function PedagogicalCoordinatorDashboard() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {activeTab === 'home' && <CoordinatorOverview />}
             {activeTab === 'academique' && <AcademicManagement />}

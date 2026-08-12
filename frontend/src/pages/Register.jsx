@@ -13,6 +13,9 @@ const MODES = {
   CREATE: 'create',
 }
 
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
+import { AlertCircle } from 'lucide-react'
+
 function Register() {
   const [mode, setMode] = useState(MODES.JOIN)
   const [error, setError] = useState('')
@@ -21,71 +24,83 @@ function Register() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-700 via-indigo-800 to-purple-900 flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-md md:max-w-lg">
-        <div className="text-center mb-8 md:mb-10">
-          <div className="inline-flex items-center justify-center gap-3 mb-4">
-            <div className="bg-white/10 backdrop-blur-sm p-3 rounded-xl shadow-lg">
-              <UserPlus className="w-10 h-10 md:w-12 md:h-12 text-white" />
+    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-900 flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-xl">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center gap-3 mb-3">
+            <div className="bg-indigo-500/10 backdrop-blur-md p-3 rounded-2xl border border-indigo-500/20 shadow-xl">
+              <UserPlus className="w-8 h-8 text-indigo-400" />
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">
+            <h1 className="text-3xl font-extrabold text-white tracking-tight">
               Inscription SIG-Lycée
             </h1>
           </div>
-          <p className="text-indigo-200 text-base md:text-lg">
+          <p className="text-indigo-200/70 text-sm font-medium">
             {mode === MODES.JOIN ? 'Créez votre compte élève ou parent' : 'Créez le compte de votre établissement'}
           </p>
         </div>
 
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl shadow-black/30 p-6 md:p-8 border border-white/10">
-          <div className="grid grid-cols-2 gap-2 mb-6 p-1 bg-gray-100 rounded-xl">
-            <button
-              type="button"
-              onClick={() => { setMode(MODES.JOIN); setError(''); setSuccess('') }}
-              className={`flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-semibold transition-colors ${
-                mode === MODES.JOIN ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <School className="w-4 h-4" /> Élève / Parent
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode(MODES.CREATE); setError(''); setSuccess('') }}
-              className={`flex items-center justify-center gap-2 h-11 rounded-lg text-sm font-semibold transition-colors ${
-                mode === MODES.CREATE ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Building2 className="w-4 h-4" /> Créer un établissement
-            </button>
-          </div>
-
-          {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
-              {success}
+        <Card className="border-slate-800 bg-slate-950/80 backdrop-blur-xl shadow-2xl text-slate-100">
+          <CardHeader className="space-y-1">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 border border-slate-800 rounded-xl mb-4">
+              <button
+                type="button"
+                onClick={() => { setMode(MODES.JOIN); setError(''); setSuccess('') }}
+                className={`flex items-center justify-center gap-2 h-10 rounded-lg text-xs font-semibold transition-all ${
+                  mode === MODES.JOIN 
+                    ? 'bg-indigo-600 text-white shadow' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <School className="w-4 h-4" /> Élève / Parent
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode(MODES.CREATE); setError(''); setSuccess('') }}
+                className={`flex items-center justify-center gap-2 h-10 rounded-lg text-xs font-semibold transition-all ${
+                  mode === MODES.CREATE 
+                    ? 'bg-indigo-600 text-white shadow' 
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Building2 className="w-4 h-4" /> Établissement
+              </button>
             </div>
-          )}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">!</div>
-              {error}
-            </div>
-          )}
+            <CardTitle className="text-2xl font-bold text-center">Création de compte</CardTitle>
+            <CardDescription className="text-center text-slate-400">
+              Remplissez les champs ci-dessous pour vous inscrire
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            {success && (
+              <div className="p-3 bg-emerald-950/50 border border-emerald-500/30 rounded-lg text-emerald-200 text-xs">
+                {success}
+              </div>
+            )}
+            {error && (
+              <div className="p-3 bg-red-950/50 border border-red-500/30 rounded-lg text-red-200 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-          {mode === MODES.JOIN ? (
-            <JoinForm setError={setError} setSuccess={setSuccess} loading={loading} setLoading={setLoading} />
-          ) : (
-            <CreateEcoleForm setError={setError} setSuccess={setSuccess} loading={loading} setLoading={setLoading} navigate={navigate} />
-          )}
+            {mode === MODES.JOIN ? (
+              <JoinForm setError={setError} setSuccess={setSuccess} loading={loading} setLoading={setLoading} />
+            ) : (
+              <CreateEcoleForm setError={setError} setSuccess={setSuccess} loading={loading} setLoading={setLoading} navigate={navigate} />
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-2 border-t border-slate-900 pt-4">
+            <p className="text-center text-xs text-slate-400">
+              Déjà un compte ?{' '}
+              <button onClick={() => navigate('/login')} className="text-indigo-400 hover:text-indigo-300 font-semibold hover:underline transition-colors">
+                Se connecter
+              </button>
+            </p>
+          </CardFooter>
+        </Card>
 
-          <div className="mt-6 text-center text-sm text-gray-600">
-            Déjà un compte ?{' '}
-            <button onClick={() => navigate('/login')} className="text-indigo-600 hover:text-indigo-800 font-medium hover:underline">
-              Se connecter
-            </button>
-          </div>
-        </div>
-
-        <p className="text-center text-indigo-200/80 text-sm mt-8">
+        <p className="text-center text-slate-500 text-xs mt-8">
           © {new Date().getFullYear()} SIG-Lycée • Tous droits réservés
         </p>
       </div>
@@ -156,97 +171,97 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="first_name">Prénom *</Label>
+          <Label htmlFor="first_name" className="text-slate-300">Prénom *</Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <Input
               id="first_name" name="first_name" value={formData.first_name} onChange={handleChange}
-              placeholder="Votre prénom" required className="pl-11 h-12 rounded-xl"
+              placeholder="Votre prénom" required className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="last_name">Nom *</Label>
+          <Label htmlFor="last_name" className="text-slate-300">Nom *</Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <Input
               id="last_name" name="last_name" value={formData.last_name} onChange={handleChange}
-              placeholder="Votre nom" required className="pl-11 h-12 rounded-xl"
+              placeholder="Votre nom" required className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="email">Email *</Label>
+        <Label htmlFor="email" className="text-slate-300">Email *</Label>
         <div className="relative">
-          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <Input
             id="email" type="email" name="email" value={formData.email} onChange={handleChange}
-            placeholder="exemple@lycee.mg" required autoComplete="email" className="pl-11 h-12 rounded-xl"
+            placeholder="exemple@lycee.mg" required autoComplete="email" className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
           />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="password">Mot de passe *</Label>
+        <Label htmlFor="password" className="text-slate-300">Mot de passe *</Label>
         <div className="relative">
-          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <Input
             id="password" type="password" name="password" value={formData.password} onChange={handleChange}
-            placeholder="Au moins 6 caractères" required autoComplete="new-password" className="pl-11 h-12 rounded-xl"
+            placeholder="Au moins 6 caractères" required autoComplete="new-password" className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
           />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="ecole">Établissement *</Label>
+        <Label htmlFor="ecole" className="text-slate-300">Établissement *</Label>
         <select
           id="ecole" name="ecole" value={formData.ecole} onChange={handleChange} required
-          className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          className="w-full h-10 px-3 py-2 border border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-900 text-slate-100 text-sm"
         >
-          <option value="" disabled>Sélectionnez votre établissement</option>
+          <option value="" disabled className="bg-slate-900 text-slate-400">Sélectionnez votre établissement</option>
           {ecoles.map((ecole) => (
-            <option key={ecole.id} value={ecole.id}>{ecole.nom}</option>
+            <option key={ecole.id} value={ecole.id} className="bg-slate-900 text-slate-100">{ecole.nom}</option>
           ))}
         </select>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="role">Vous êtes *</Label>
+        <Label htmlFor="role" className="text-slate-300">Vous êtes *</Label>
         <select
           id="role" name="role" value={formData.role} onChange={handleChange} required
-          className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          className="w-full h-10 px-3 py-2 border border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-900 text-slate-100 text-sm"
         >
-          <option value="ETUDIANT">Élève</option>
-          <option value="PARENT">Parent</option>
+          <option value="ETUDIANT" className="bg-slate-900 text-slate-100">Élève</option>
+          <option value="PARENT" className="bg-slate-900 text-slate-100">Parent</option>
         </select>
-        <p className="text-xs text-gray-500">
+        <p className="text-[10px] text-slate-500">
           Les comptes du personnel (enseignant, administration...) sont créés par l'établissement.
         </p>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="genre">Genre</Label>
+        <Label htmlFor="genre" className="text-slate-300">Genre</Label>
         <select
           id="genre" name="genre" value={formData.genre} onChange={handleChange}
-          className="w-full h-12 px-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+          className="w-full h-10 px-3 py-2 border border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-900 text-slate-100 text-sm"
         >
-          <option value="H">Masculin</option>
-          <option value="F">Féminin</option>
-          <option value="A">Autre / Non précisé</option>
+          <option value="H" className="bg-slate-900 text-slate-100">Masculin</option>
+          <option value="F" className="bg-slate-900 text-slate-100">Féminin</option>
+          <option value="A" className="bg-slate-900 text-slate-100">Autre / Non précisé</option>
         </select>
       </div>
 
       <Button
         type="submit"
         disabled={loading}
-        className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/30"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-lg shadow-indigo-500/20 mt-2"
       >
-        {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+        {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
         {loading ? 'Inscription en cours...' : 'Créer mon compte'}
       </Button>
     </form>
@@ -314,98 +329,98 @@ function CreateEcoleForm({ setError, setSuccess, loading, setLoading, navigate }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-3">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Établissement</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide">Établissement</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="ecole_nom">Nom de l'établissement *</Label>
+            <Label htmlFor="ecole_nom" className="text-slate-300">Nom de l'établissement *</Label>
             <Input
               id="ecole_nom" name="ecole_nom" value={formData.ecole_nom} onChange={handleChange}
-              placeholder="Lycée Saint-Michel" required className="h-12 rounded-xl"
+              placeholder="Lycée Saint-Michel" required className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ecole_code">Code établissement *</Label>
+            <Label htmlFor="ecole_code" className="text-slate-300">Code établissement *</Label>
             <Input
               id="ecole_code" name="ecole_code" value={formData.ecole_code} onChange={handleChange}
-              placeholder="LYC-SM" required className="h-12 rounded-xl"
+              placeholder="LYC-SM" required className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ecole_adresse">Adresse</Label>
+          <Label htmlFor="ecole_adresse" className="text-slate-300">Adresse</Label>
           <Input
             id="ecole_adresse" name="ecole_adresse" value={formData.ecole_adresse} onChange={handleChange}
-            placeholder="Adresse de l'établissement" className="h-12 rounded-xl"
+            placeholder="Adresse de l'établissement" className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
           />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="ecole_telephone">Téléphone établissement</Label>
+            <Label htmlFor="ecole_telephone" className="text-slate-300">Téléphone établissement</Label>
             <Input
               id="ecole_telephone" name="ecole_telephone" value={formData.ecole_telephone} onChange={handleChange}
-              placeholder="+261 34 00 000 00" className="h-12 rounded-xl"
+              placeholder="+261 34 00 000 00" className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="ecole_email">Email établissement</Label>
+            <Label htmlFor="ecole_email" className="text-slate-300">Email établissement</Label>
             <Input
               id="ecole_email" type="email" name="ecole_email" value={formData.ecole_email} onChange={handleChange}
-              placeholder="contact@etablissement.mg" className="h-12 rounded-xl"
+              placeholder="contact@etablissement.mg" className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
       </div>
 
-      <div className="space-y-3 pt-2 border-t border-gray-100">
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide pt-3">Votre compte administrateur</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div className="space-y-3 pt-2 border-t border-slate-900">
+        <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide pt-3">Votre compte administrateur</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <Label htmlFor="admin_first_name">Prénom *</Label>
+            <Label htmlFor="admin_first_name" className="text-slate-300">Prénom *</Label>
             <Input
               id="admin_first_name" name="admin_first_name" value={formData.admin_first_name} onChange={handleChange}
-              placeholder="Votre prénom" required className="h-12 rounded-xl"
+              placeholder="Votre prénom" required className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="admin_last_name">Nom *</Label>
+            <Label htmlFor="admin_last_name" className="text-slate-300">Nom *</Label>
             <Input
               id="admin_last_name" name="admin_last_name" value={formData.admin_last_name} onChange={handleChange}
-              placeholder="Votre nom" required className="h-12 rounded-xl"
+              placeholder="Votre nom" required className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="admin_email">Email *</Label>
+          <Label htmlFor="admin_email" className="text-slate-300">Email *</Label>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <Input
               id="admin_email" type="email" name="admin_email" value={formData.admin_email} onChange={handleChange}
-              placeholder="admin@etablissement.mg" required autoComplete="email" className="pl-11 h-12 rounded-xl"
+              placeholder="admin@etablissement.mg" required autoComplete="email" className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="admin_password">Mot de passe *</Label>
+          <Label htmlFor="admin_password" className="text-slate-300">Mot de passe *</Label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <Input
               id="admin_password" type="password" name="admin_password" value={formData.admin_password} onChange={handleChange}
-              placeholder="Au moins 6 caractères" required autoComplete="new-password" className="pl-11 h-12 rounded-xl"
+              placeholder="Au moins 6 caractères" required autoComplete="new-password" className="pl-10 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
             />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="admin_telephone">Téléphone</Label>
+          <Label htmlFor="admin_telephone" className="text-slate-300">Téléphone</Label>
           <Input
             id="admin_telephone" name="admin_telephone" value={formData.admin_telephone} onChange={handleChange}
-            placeholder="+261 34 00 000 00" className="h-12 rounded-xl"
+            placeholder="+261 34 00 000 00" className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
           />
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-[10px] text-slate-500 leading-normal">
         Vous serez administrateur de cet établissement avec un accès complet. Vous pourrez ensuite créer les comptes
         du personnel (enseignants, secrétariat, responsables pédagogiques) depuis votre tableau de bord.
       </p>
@@ -413,9 +428,9 @@ function CreateEcoleForm({ setError, setSuccess, loading, setLoading, navigate }
       <Button
         type="submit"
         disabled={loading}
-        className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/30"
+        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-lg shadow-indigo-500/20"
       >
-        {loading && <Loader2 className="w-5 h-5 animate-spin" />}
+        {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
         {loading ? 'Création en cours...' : "Créer mon établissement"}
       </Button>
     </form>
