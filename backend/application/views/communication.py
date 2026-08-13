@@ -3,9 +3,12 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import Annonce, Classe, Message, MessageGroupeClasse, Notification, User
+from ..models import Annonce, Classe, DiscussionClasse, Message, MessageGroupeClasse, Notification, User
 from ..permissions import CanAccessMessageGroupeClasse, EcoleScopedQuerysetMixin, IsStaffPedagogique
-from ..serializers import AnnonceSerializer, MessageGroupeClasseSerializer, MessageSerializer, NotificationSerializer
+from ..serializers import (
+    AnnonceSerializer, DiscussionClasseSerializer, MessageGroupeClasseSerializer, MessageSerializer,
+    NotificationSerializer,
+)
 
 
 class MessageViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -64,6 +67,57 @@ class MessageGroupeClasseViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet
         if enseignant_id:
             qs = qs.filter(enseignant_id=enseignant_id)
         return qs
+
+
+class DiscussionClasseViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
+    """État ouverte/fermée du chat de groupe d'une classe. Consultation par les mêmes personnes
+
+    que le chat lui-même ; seul l'enseignant concerné (ou un admin) peut basculer l'état, via
+    l'action `definir` (upsert — pas de création/modification directe pour éviter les conflits
+    d'unicité (classe, enseignant)).
+    """
+    http_method_names = ['get', 'post', 'head', 'options']
+    queryset = DiscussionClasse.objects.select_related('classe', 'enseignant')
+    serializer_class = DiscussionClasseSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    ecole_field = 'classe__annee_scolaire__ecole_id'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            role = getattr(user, 'role', None)
+            if role == User.Role.ENSEIGNANT:
+                qs = qs.filter(enseignant=user)
+            elif role == User.Role.ETUDIANT:
+                qs = qs.filter(classe__inscriptions__etudiant__utilisateur=user).distinct()
+            elif role == User.Role.PARENT:
+                qs = qs.filter(classe__inscriptions__etudiant__tuteurs__parent=user).distinct()
+
+        classe_id = self.request.query_params.get('classe')
+        if classe_id:
+            qs = qs.filter(classe_id=classe_id)
+        enseignant_id = self.request.query_params.get('enseignant')
+        if enseignant_id:
+            qs = qs.filter(enseignant_id=enseignant_id)
+        return qs
+
+    @action(detail=False, methods=['post'], url_path='definir')
+    def definir(self, request):
+        user = request.user
+        classe_id = request.data.get('classe')
+        enseignant_id = request.data.get('enseignant')
+        est_ouverte = request.data.get('est_ouverte', True)
+
+        role = getattr(user, 'role', None)
+        autorise = user.is_superuser or (role == User.Role.ENSEIGNANT and str(user.id) == str(enseignant_id))
+        if not autorise:
+            return Response({'detail': 'Seul le professeur concerné peut modifier cette discussion.'}, status=403)
+
+        discussion, _ = DiscussionClasse.objects.update_or_create(
+            classe_id=classe_id, enseignant_id=enseignant_id, defaults={'est_ouverte': bool(est_ouverte)},
+        )
+        return Response(DiscussionClasseSerializer(discussion).data)
 
 
 class AnnonceViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):

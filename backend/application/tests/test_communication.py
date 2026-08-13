@@ -164,6 +164,24 @@ class MessageGroupeClasseApiTests(APITestCase):
         response = self.client.get('/api/messages-groupe-classe/', {'classe': classe.id, 'enseignant': prof.id})
         self.assertEqual(len(response.data), 1)
 
+    def test_enseignant_peut_envoyer_un_fichier_sans_texte(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        classe, prof, _, _ = self._classe_avec_prof_et_eleve()
+        self.client.force_authenticate(user=prof)
+        fichier = SimpleUploadedFile('ressource.pdf', b'%PDF-1.4 contenu', content_type='application/pdf')
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'fichier': fichier,
+        }, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertTrue(response.data['fichier'])
+
+    def test_message_sans_texte_ni_fichier_est_rejete(self):
+        classe, prof, _, _ = self._classe_avec_prof_et_eleve()
+        self.client.force_authenticate(user=prof)
+        response = self.client.post('/api/messages-groupe-classe/', {'classe': classe.id, 'enseignant': prof.id})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_eleve_de_la_classe_peut_ecrire_et_lire(self):
         from application.models import MessageGroupeClasse
 
@@ -233,6 +251,93 @@ class MessageGroupeClasseApiTests(APITestCase):
         response = self.client.get('/api/messages-groupe-classe/')
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['contenu'], 'Mon chat.')
+
+
+class DiscussionClasseApiTests(APITestCase):
+    def _classe_avec_prof_et_eleve(self):
+        classe = f.make_classe()
+        ecole = classe.annee_scolaire.ecole
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=ecole)
+        etudiant_user = f.make_user(role=User.Role.ETUDIANT, ecole=ecole)
+        etudiant = f.make_etudiant(ecole=ecole, utilisateur=etudiant_user)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        return classe, prof, etudiant_user, etudiant
+
+    def test_discussion_ouverte_par_defaut_sans_enregistrement(self):
+        classe, prof, etudiant_user, _ = self._classe_avec_prof_et_eleve()
+        self.client.force_authenticate(user=etudiant_user)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Bonjour !',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_enseignant_peut_fermer_puis_rouvrir_la_discussion(self):
+        from application.models import DiscussionClasse
+
+        classe, prof, etudiant_user, _ = self._classe_avec_prof_et_eleve()
+        self.client.force_authenticate(user=prof)
+
+        response = self.client.post('/api/discussions-classe/definir/', {
+            'classe': classe.id, 'enseignant': prof.id, 'est_ouverte': False,
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertFalse(response.data['est_ouverte'])
+        self.assertEqual(DiscussionClasse.objects.count(), 1)
+
+        # L'élève ne peut plus écrire tant que c'est fermé.
+        self.client.force_authenticate(user=etudiant_user)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Je peux répondre ?',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Mais le prof, lui, peut toujours écrire malgré la fermeture.
+        self.client.force_authenticate(user=prof)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Discussion fermée pour ce soir.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        # Réouverture : l'élève peut de nouveau répondre, et l'upsert ne crée pas de doublon.
+        response = self.client.post('/api/discussions-classe/definir/', {
+            'classe': classe.id, 'enseignant': prof.id, 'est_ouverte': True,
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['est_ouverte'])
+        self.assertEqual(DiscussionClasse.objects.count(), 1)
+
+        self.client.force_authenticate(user=etudiant_user)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Merci, je réponds enfin.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_parent_bloque_par_discussion_fermee(self):
+        classe, prof, _, etudiant = self._classe_avec_prof_et_eleve()
+        parent = f.make_user(role=User.Role.PARENT, ecole=classe.annee_scolaire.ecole)
+        TuteurEtudiant.objects.create(parent=parent, etudiant=etudiant, relation='PERE')
+
+        self.client.force_authenticate(user=prof)
+        self.client.post('/api/discussions-classe/definir/', {
+            'classe': classe.id, 'enseignant': prof.id, 'est_ouverte': False,
+        }, format='json')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Question.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_seul_le_prof_concerne_peut_fermer_sa_discussion(self):
+        classe, prof, etudiant_user, _ = self._classe_avec_prof_et_eleve()
+        autre_prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+
+        for utilisateur in (etudiant_user, autre_prof):
+            self.client.force_authenticate(user=utilisateur)
+            response = self.client.post('/api/discussions-classe/definir/', {
+                'classe': classe.id, 'enseignant': prof.id, 'est_ouverte': False,
+            }, format='json')
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
 class NotificationApiTests(APITestCase):

@@ -5,8 +5,9 @@ from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     AnneeScolaireViewSet, AnnonceViewSet, AuditLogViewSet, BulletinViewSet, CahierTexteViewSet, ChangePasswordView,
     ClasseViewSet, CustomTokenObtainPairView, DemandeDocumentViewSet, DemandeInscriptionViewSet,
-    DocumentJustificatifEtudiantViewSet, DossierEnseignantViewSet, EcoleViewSet, EmploiDuTempsViewSet,
-    EtudiantViewSet, EvenementCalendrierViewSet, EvenementDisciplinaireViewSet, FiliereViewSet,
+    DiscussionClasseViewSet, DocumentDevoirViewSet, DocumentJustificatifEtudiantViewSet, DossierEnseignantViewSet,
+    EcoleViewSet,
+    EmploiDuTempsViewSet, EtudiantViewSet, EvenementCalendrierViewSet, EvenementDisciplinaireViewSet, FiliereViewSet,
     FraisScolariteViewSet, InscriptionViewSet, MatiereViewSet, MessageGroupeClasseViewSet, MessageViewSet,
     NiveauViewSet, NotificationViewSet,
     NoteViewSet, PaiementEcolageViewSet, PaiementSalaireViewSet, PieceJointeInscriptionViewSet,
@@ -35,6 +36,7 @@ router.register('paiements', PaiementEcolageViewSet, basename='paiementecolage')
 router.register('presences', PresenceCoursViewSet, basename='presencecours')
 router.register('emplois-du-temps', EmploiDuTempsViewSet, basename='emploidutemps')
 router.register('cahier-textes', CahierTexteViewSet, basename='cahiertexte')
+router.register('documents-devoirs', DocumentDevoirViewSet, basename='documentdevoir')
 router.register('discipline', EvenementDisciplinaireViewSet, basename='evenementdisciplinaire')
 router.register('dossiers-enseignants', DossierEnseignantViewSet, basename='dossierenseignant')
 router.register('paiements-salaire', PaiementSalaireViewSet, basename='paiementsalaire')
@@ -44,6 +46,7 @@ router.register('bulletins', BulletinViewSet, basename='bulletin')
 router.register('demandes-documents', DemandeDocumentViewSet, basename='demandedocument')
 router.register('messages', MessageViewSet, basename='message')
 router.register('messages-groupe-classe', MessageGroupeClasseViewSet, basename='messagegroupeclasse')
+router.register('discussions-classe', DiscussionClasseViewSet, basename='discussionclasse')
 router.register('annonces', AnnonceViewSet, basename='annonce')
 router.register('notifications', NotificationViewSet, basename='notification')
 router.register('audit-logs', AuditLogViewSet, basename='auditlog')

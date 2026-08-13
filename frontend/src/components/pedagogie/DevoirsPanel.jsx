@@ -7,6 +7,7 @@ import { useCreateResource, useDeleteResource, useResourceList } from '@/hooks/u
 import { cahierTexteService, classeService, envoyerRappelsDevoirs, matiereService } from '@/services'
 import { Button } from '@/components/ui/button'
 import { ChatClassePanel } from '@/components/pedagogie/ChatClassePanel'
+import { DocumentsDevoirSection } from '@/components/pedagogie/DocumentsDevoirSection'
 
 const EMPTY_FORM = {
   classe: '', matiere: '', travail_a_faire: '', date_echeance_travail: '', heure_echeance_travail: '', lien: '',
@@ -307,6 +308,7 @@ export function DevoirsPanel() {
                     )}
                   </div>
                 )}
+                <DocumentsDevoirSection cahierTexteId={d.id} />
               </div>
               <button onClick={() => handleDelete(d.id)} className="p-1.5 hover:bg-muted rounded flex-shrink-0">
                 <Trash2 className="w-4 h-4 text-red-500" />

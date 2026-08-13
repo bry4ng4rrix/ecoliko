@@ -30,6 +30,7 @@ import { NotificationBell } from '@/components/NotificationBell'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
 import { MessageriePanel } from '@/components/communication/MessageriePanel'
 import { CahierTextePanel } from '@/components/pedagogie/CahierTextePanel'
+import { ChatClassePanel } from '@/components/pedagogie/ChatClassePanel'
 
 /** L'API /etudiants/ est déjà scopée côté backend au dossier du seul élève connecté. */
 function useMonDossier() {
@@ -416,6 +417,14 @@ function StudentEmploiDuTemps() {
 // ============ DEVOIRS ============
 function StudentDevoirs() {
   const { data: entrees, isLoading } = useResourceList('cahier-textes', cahierTexteService)
+  const { data: emploiDuTemps } = useResourceList('emplois-du-temps', emploiDuTempsService)
+  const [enseignantChatId, setEnseignantChatId] = useState('')
+
+  const classeId = emploiDuTemps?.[0]?.classe ?? entrees?.[0]?.classe ?? null
+  const classeNom = emploiDuTemps?.[0]?.classe_nom ?? entrees?.[0]?.classe_nom ?? ''
+  const enseignantsUniques = [...new Map(
+    (emploiDuTemps ?? []).filter((s) => s.enseignant).map((s) => [s.enseignant, { id: s.enseignant, nom: s.enseignant_nom }])
+  ).values()]
 
   const aujourdhui = new Date().toISOString().slice(0, 10)
   const devoirs = (entrees ?? [])
@@ -475,6 +484,24 @@ function StudentDevoirs() {
             </div>
           )
         })}
+      </div>
+
+      <div className="bg-card rounded-lg border border-border p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-lg font-bold">Discussion de classe</h2>
+          <select
+            value={enseignantChatId} onChange={(e) => setEnseignantChatId(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">Choisir un professeur</option>
+            {enseignantsUniques.map((ens) => <option key={ens.id} value={ens.id}>{ens.nom}</option>)}
+          </select>
+        </div>
+        {enseignantChatId ? (
+          <ChatClassePanel classeId={classeId} enseignantId={Number(enseignantChatId)} classeNom={classeNom} />
+        ) : (
+          <p className="text-sm text-muted-foreground">Sélectionnez un professeur pour ouvrir la discussion de votre classe avec lui.</p>
+        )}
       </div>
     </div>
   )

@@ -9,10 +9,12 @@ from .academique import (
 from .etudiants import EtudiantViewSet, InscriptionViewSet, TuteurEtudiantViewSet
 from .pedagogie import MatiereViewSet, NoteViewSet
 from .finance import FraisScolariteViewSet, PaiementEcolageViewSet
-from .vie_scolaire import CahierTexteViewSet, EmploiDuTempsViewSet, PresenceCoursViewSet
+from .vie_scolaire import CahierTexteViewSet, DocumentDevoirViewSet, EmploiDuTempsViewSet, PresenceCoursViewSet
 from .bulletin import BulletinViewSet
 from .documents import DemandeDocumentViewSet
-from .communication import AnnonceViewSet, MessageGroupeClasseViewSet, MessageViewSet, NotificationViewSet
+from .communication import (
+    AnnonceViewSet, DiscussionClasseViewSet, MessageGroupeClasseViewSet, MessageViewSet, NotificationViewSet,
+)
 from .audit import AuditLogViewSet
 from .statistiques import StatistiquesView
 from .discipline import EvenementDisciplinaireViewSet
@@ -29,9 +31,10 @@ __all__ = [
     'EtudiantViewSet', 'InscriptionViewSet', 'TuteurEtudiantViewSet',
     'MatiereViewSet', 'NoteViewSet',
     'FraisScolariteViewSet', 'PaiementEcolageViewSet',
-    'PresenceCoursViewSet', 'EmploiDuTempsViewSet', 'CahierTexteViewSet', 'BulletinViewSet',
+    'PresenceCoursViewSet', 'EmploiDuTempsViewSet', 'CahierTexteViewSet', 'DocumentDevoirViewSet', 'BulletinViewSet',
     'DemandeDocumentViewSet',
-    'AnnonceViewSet', 'MessageGroupeClasseViewSet', 'MessageViewSet', 'NotificationViewSet',
+    'AnnonceViewSet', 'DiscussionClasseViewSet', 'MessageGroupeClasseViewSet', 'MessageViewSet',
+    'NotificationViewSet',
     'AuditLogViewSet', 'StatistiquesView', 'EvenementDisciplinaireViewSet',
     'DossierEnseignantViewSet', 'EvenementCalendrierViewSet', 'DocumentJustificatifEtudiantViewSet',
     'PieceJointeInscriptionViewSet', 'PaiementSalaireViewSet',

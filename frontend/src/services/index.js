@@ -31,6 +31,16 @@ export const paiementSalaireService = createResourceService("/paiements-salaire"
 export const evenementCalendrierService = createResourceService("/evenements-calendrier")
 export const documentEtudiantService = createResourceService("/documents-etudiants")
 export const messageGroupeClasseService = createResourceService("/messages-groupe-classe")
+export const documentDevoirService = createResourceService("/documents-devoirs")
+export const discussionClasseService = createResourceService("/discussions-classe")
+
+/** Ouvre ou ferme la discussion de groupe d'une classe (bascule réservée au professeur concerné). */
+export async function definirDiscussionClasse(classeId, enseignantId, estOuverte) {
+  const { data } = await apiClient.post('/discussions-classe/definir/', {
+    classe: classeId, enseignant: enseignantId, est_ouverte: estOuverte,
+  })
+  return data
+}
 
 export { authService } from "./authService"
 

@@ -17,10 +17,16 @@ from .pedagogie import MatiereSerializer, NoteSerializer
 from .finance import (
     DossierFinancierSerializer, FraisScolariteSerializer, PaiementEcolageSerializer, SyntheseFinanciereSerializer,
 )
-from .vie_scolaire import AppelDuJourSerializer, CahierTexteSerializer, EmploiDuTempsSerializer, PresenceCoursSerializer
+from .vie_scolaire import (
+    AppelDuJourSerializer, CahierTexteSerializer, DocumentDevoirSerializer, EmploiDuTempsSerializer,
+    PresenceCoursSerializer,
+)
 from .bulletin import BulletinSerializer, GenererBulletinSerializer
 from .documents import DemandeDocumentSerializer, RefuserDemandeSerializer
-from .communication import AnnonceSerializer, MessageGroupeClasseSerializer, MessageSerializer, NotificationSerializer
+from .communication import (
+    AnnonceSerializer, DiscussionClasseSerializer, MessageGroupeClasseSerializer, MessageSerializer,
+    NotificationSerializer,
+)
 
 __all__ = [
     'CustomTokenObtainPairSerializer', 'DemandeInscriptionSerializer', 'RegisterSerializer',
@@ -30,10 +36,10 @@ __all__ = [
     'EtudiantSerializer', 'InscriptionSerializer', 'TuteurEtudiantSerializer',
     'MatiereSerializer', 'NoteSerializer',
     'DossierFinancierSerializer', 'FraisScolariteSerializer', 'PaiementEcolageSerializer',
-    'SyntheseFinanciereSerializer', 'AppelDuJourSerializer', 'PresenceCoursSerializer',
+    'SyntheseFinanciereSerializer', 'AppelDuJourSerializer', 'PresenceCoursSerializer', 'DocumentDevoirSerializer',
     'EmploiDuTempsSerializer', 'BulletinSerializer', 'GenererBulletinSerializer',
     'DemandeDocumentSerializer', 'RefuserDemandeSerializer',
     'DemandeInscriptionSuiviSerializer', 'PieceJointeInscriptionSerializer', 'DocumentJustificatifEtudiantSerializer',
-    'AnnonceSerializer', 'MessageGroupeClasseSerializer', 'MessageSerializer', 'NotificationSerializer',
-    'PaiementSalaireSerializer',
+    'AnnonceSerializer', 'DiscussionClasseSerializer', 'MessageGroupeClasseSerializer', 'MessageSerializer',
+    'NotificationSerializer', 'PaiementSalaireSerializer',
 ]

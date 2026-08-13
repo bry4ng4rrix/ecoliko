@@ -179,11 +179,46 @@ class CanManageCahierTexte(CanManageMatiereScopedResource):
     pass
 
 
+class CanManageDocumentDevoir(permissions.BasePermission):
+    """Import de documents pour un devoir : réservé à l'enseignant propriétaire de la matière
+
+    du devoir concerné (même titulaire que le `CahierTexte` lui-même) ; lecture ouverte aux
+    autres rôles concernés, filtrée par `get_queryset` du ViewSet.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser or user.role == 'ADMIN':
+            return True
+        if view.action not in ('create', 'destroy'):
+            return True  # list/retrieve : borné par get_queryset
+
+        from .models import CahierTexte
+
+        if user.role != 'ENSEIGNANT':
+            return False
+        if view.action == 'create':
+            return CahierTexte.objects.filter(
+                pk=request.data.get('cahier_texte'), matiere__enseignant=user
+            ).exists()
+        return True  # destroy : vérifié par has_object_permission
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.is_superuser or user.role == 'ADMIN':
+            return True
+        return obj.cahier_texte.matiere.enseignant_id == user.id
+
+
 class CanAccessMessageGroupeClasse(permissions.BasePermission):
     """Chat de groupe (classe + enseignant) : accessible en lecture/écriture par l'enseignant
 
     concerné, les élèves de la classe et leurs parents. Le personnel (admin/secrétariat/
     responsable) peut consulter (supervision) via `get_queryset`, mais n'écrit pas ici.
+    Si l'enseignant a fermé la discussion (`DiscussionClasse.est_ouverte=False`), les élèves
+    et parents ne peuvent plus y écrire — l'enseignant, lui, écrit toujours.
     """
 
     def has_permission(self, request, view):
@@ -195,19 +230,26 @@ class CanAccessMessageGroupeClasse(permissions.BasePermission):
         if view.action != 'create':
             return True  # list/retrieve : borné par get_queryset du ViewSet
 
-        from .models import Etudiant
+        from .models import DiscussionClasse, Etudiant
 
         role = getattr(user, 'role', None)
         classe_id = request.data.get('classe')
+        enseignant_id = request.data.get('enseignant')
         if role == 'ENSEIGNANT':
-            return str(user.id) == str(request.data.get('enseignant'))
+            return str(user.id) == str(enseignant_id)  # le prof écrit toujours, même discussion fermée
+
+        est_membre = False
         if role == 'ETUDIANT':
-            return Etudiant.objects.filter(utilisateur=user, inscriptions__classe_id=classe_id).exists()
-        if role == 'PARENT':
-            return Etudiant.objects.filter(
+            est_membre = Etudiant.objects.filter(utilisateur=user, inscriptions__classe_id=classe_id).exists()
+        elif role == 'PARENT':
+            est_membre = Etudiant.objects.filter(
                 tuteurs__parent=user, inscriptions__classe_id=classe_id
             ).exists()
-        return False
+        if not est_membre:
+            return False
+
+        discussion = DiscussionClasse.objects.filter(classe_id=classe_id, enseignant_id=enseignant_id).first()
+        return discussion is None or discussion.est_ouverte  # pas d'enregistrement = ouverte par défaut
 
 
 class IsSameEcole(permissions.BasePermission):

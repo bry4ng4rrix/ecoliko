@@ -2,12 +2,15 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import CahierTexte, EmploiDuTemps, Matiere, PresenceCours, User
+from ..models import CahierTexte, DocumentDevoir, EmploiDuTemps, Matiere, PresenceCours, User
 from ..permissions import (
-    CanManageCahierTexte, CanManagePresence, EcoleScopedQuerysetMixin, IsStaffPedagogique,
+    CanManageCahierTexte, CanManageDocumentDevoir, CanManagePresence, EcoleScopedQuerysetMixin, IsStaffPedagogique,
     ReadOnlyOrAdminOrSecretariat,
 )
-from ..serializers import AppelDuJourSerializer, CahierTexteSerializer, EmploiDuTempsSerializer, PresenceCoursSerializer
+from ..serializers import (
+    AppelDuJourSerializer, CahierTexteSerializer, DocumentDevoirSerializer, EmploiDuTempsSerializer,
+    PresenceCoursSerializer,
+)
 from ..services.devoirs import envoyer_rappels_devoirs
 from ..services.vie_scolaire import enregistrer_appel
 
@@ -158,3 +161,33 @@ class CahierTexteViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         jours_avant = int(request.data.get('jours_avant', 3))
         resultat = envoyer_rappels_devoirs(jours_avant=jours_avant)
         return Response(resultat)
+
+
+class DocumentDevoirViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
+    """Documents importés pour un devoir (en plus de l'unique pièce jointe du devoir lui-même) :
+
+    plusieurs fichiers peuvent être attachés à un même devoir. Import/suppression réservés à
+    l'enseignant propriétaire de la matière ; lecture ouverte aux élèves/parents de la classe.
+    """
+    http_method_names = ['get', 'post', 'delete', 'head', 'options']
+    queryset = DocumentDevoir.objects.select_related('cahier_texte', 'importe_par')
+    serializer_class = DocumentDevoirSerializer
+    permission_classes = [permissions.IsAuthenticated, CanManageDocumentDevoir]
+    ecole_field = 'cahier_texte__classe__annee_scolaire__ecole_id'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            role = getattr(user, 'role', None)
+            if role == User.Role.ENSEIGNANT:
+                qs = qs.filter(cahier_texte__matiere__enseignant=user)
+            elif role == User.Role.ETUDIANT:
+                qs = qs.filter(cahier_texte__classe__inscriptions__etudiant__utilisateur=user).distinct()
+            elif role == User.Role.PARENT:
+                qs = qs.filter(cahier_texte__classe__inscriptions__etudiant__tuteurs__parent=user).distinct()
+
+        cahier_texte_id = self.request.query_params.get('cahier_texte')
+        if cahier_texte_id:
+            qs = qs.filter(cahier_texte_id=cahier_texte_id)
+        return qs

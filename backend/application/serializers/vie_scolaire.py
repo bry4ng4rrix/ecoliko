@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from ..models import CahierTexte, EmploiDuTemps, PresenceCours
+from ..models import CahierTexte, DocumentDevoir, EmploiDuTemps, PresenceCours
 from .base import ValidatedModelSerializer
 
 
@@ -80,4 +80,19 @@ class CahierTexteSerializer(ValidatedModelSerializer):
 
     def create(self, validated_data):
         validated_data['enseignant'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class DocumentDevoirSerializer(ValidatedModelSerializer):
+    importe_par_nom = serializers.CharField(source='importe_par.get_full_name', read_only=True, default=None)
+
+    class Meta:
+        model = DocumentDevoir
+        fields = ('id', 'cahier_texte', 'nom', 'fichier', 'importe_par', 'importe_par_nom', 'date_import')
+        read_only_fields = ('importe_par', 'date_import')
+
+    def create(self, validated_data):
+        validated_data['importe_par'] = self.context['request'].user
+        if not validated_data.get('nom'):
+            validated_data['nom'] = validated_data['fichier'].name
         return super().create(validated_data)

@@ -161,3 +161,78 @@ class DevoirCalendrierSyncTests(APITestCase):
         classes_vues = {row['classe'] for row in response.data}
         self.assertIn(classe.id, classes_vues)
         self.assertNotIn(autre_classe.id, classes_vues)
+
+
+class DocumentDevoirTests(APITestCase):
+    def _devoir_du_prof(self):
+        classe = f.make_classe()
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau)
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+        matiere.enseignant = prof
+        matiere.save()
+        devoir = CahierTexte.objects.create(
+            classe=classe, matiere=matiere, date_seance='2026-01-10',
+            travail_a_faire='Exercices.', date_echeance_travail='2026-01-17',
+        )
+        return devoir, prof, classe
+
+    def test_enseignant_peut_importer_plusieurs_documents(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        devoir, prof, _ = self._devoir_du_prof()
+        self.client.force_authenticate(user=prof)
+
+        for nom, contenu in [('enonce.pdf', b'%PDF-1.4 enonce'), ('corrige.pdf', b'%PDF-1.4 corrige')]:
+            fichier = SimpleUploadedFile(nom, contenu, content_type='application/pdf')
+            response = self.client.post('/api/documents-devoirs/', {
+                'cahier_texte': devoir.id, 'fichier': fichier,
+            }, format='multipart')
+            self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        response = self.client.get('/api/documents-devoirs/', {'cahier_texte': devoir.id})
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['nom'], 'corrige.pdf')  # nom auto-rempli depuis le fichier
+
+    def test_autre_enseignant_ne_peut_pas_importer_sur_ce_devoir(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        devoir, prof, classe = self._devoir_du_prof()
+        autre_prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+        self.client.force_authenticate(user=autre_prof)
+
+        fichier = SimpleUploadedFile('intrus.pdf', b'contenu', content_type='application/pdf')
+        response = self.client.post('/api/documents-devoirs/', {'cahier_texte': devoir.id, 'fichier': fichier}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_eleve_de_la_classe_peut_lire_mais_pas_importer(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from application.models import DocumentDevoir
+
+        devoir, prof, classe = self._devoir_du_prof()
+        DocumentDevoir.objects.create(cahier_texte=devoir, fichier=SimpleUploadedFile('enonce.pdf', b'x'), importe_par=prof)
+
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        etudiant.utilisateur = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.save()
+        f.make_inscription(etudiant=etudiant, classe=classe)
+
+        self.client.force_authenticate(user=etudiant.utilisateur)
+        response = self.client.get('/api/documents-devoirs/')
+        self.assertEqual(len(response.data), 1)
+
+        fichier = SimpleUploadedFile('tentative.pdf', b'x', content_type='application/pdf')
+        response = self.client.post('/api/documents-devoirs/', {'cahier_texte': devoir.id, 'fichier': fichier}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_enseignant_peut_supprimer_un_document_importe(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from application.models import DocumentDevoir
+
+        devoir, prof, _ = self._devoir_du_prof()
+        document = DocumentDevoir.objects.create(
+            cahier_texte=devoir, fichier=SimpleUploadedFile('a-supprimer.pdf', b'x'), importe_par=prof,
+        )
+        self.client.force_authenticate(user=prof)
+        response = self.client.delete(f'/api/documents-devoirs/{document.id}/')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(DocumentDevoir.objects.filter(pk=document.id).exists())

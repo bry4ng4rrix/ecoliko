@@ -1159,7 +1159,11 @@ class MessageGroupeClasse(models.Model):
     auteur = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name='messages_groupe_envoyes', verbose_name=_('auteur')
     )
-    contenu = models.TextField(_('contenu'))
+    contenu = models.TextField(_('contenu'), blank=True)
+    fichier = models.FileField(
+        _('fichier'), upload_to='messages_groupe_classe/', blank=True, null=True,
+        help_text=_('Pièce jointe optionnelle (image, PDF, document...).'),
+    )
     date_envoi = models.DateTimeField(_("date d'envoi"), auto_now_add=True)
 
     class Meta:
@@ -1169,6 +1173,39 @@ class MessageGroupeClasse(models.Model):
 
     def __str__(self):
         return f"{self.classe} / {self.enseignant} — {self.auteur} : {self.contenu[:30]}"
+
+    def clean(self):
+        if self.classe_id and self.enseignant_id and self.classe.annee_scolaire.ecole_id != self.enseignant.ecole_id:
+            raise ValidationError(_("La classe et l'enseignant doivent appartenir au même établissement."))
+        if not self.contenu and not self.fichier:
+            raise ValidationError(_('Le message doit contenir du texte ou une pièce jointe.'))
+
+
+class DiscussionClasse(models.Model):
+    """État (ouverte/fermée) du chat de groupe d'une classe pour un enseignant donné : le
+
+    professeur peut fermer la discussion pour empêcher temporairement les élèves (et leurs
+    parents) d'y répondre — lui-même peut toujours écrire — puis la rouvrir. L'absence
+    d'enregistrement pour un (classe, enseignant) donné vaut discussion ouverte par défaut.
+    """
+    classe = models.ForeignKey(
+        Classe, on_delete=models.CASCADE, related_name='discussions', verbose_name=_('classe')
+    )
+    enseignant = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='discussions_classes',
+        limit_choices_to={'role': User.Role.ENSEIGNANT}, verbose_name=_('enseignant'),
+    )
+    est_ouverte = models.BooleanField(_('discussion ouverte'), default=True)
+    date_modification = models.DateTimeField(_('dernière modification'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('discussion de classe')
+        verbose_name_plural = _('discussions de classe')
+        unique_together = ['classe', 'enseignant']
+
+    def __str__(self):
+        etat = 'ouverte' if self.est_ouverte else 'fermée'
+        return f"{self.classe} / {self.enseignant} — {etat}"
 
     def clean(self):
         if self.classe_id and self.enseignant_id and self.classe.annee_scolaire.ecole_id != self.enseignant.ecole_id:
@@ -1529,6 +1566,33 @@ class CahierTexte(models.Model):
     def clean(self):
         if self.classe_id and self.matiere_id and self.classe.annee_scolaire.ecole_id != self.matiere.ecole_id:
             raise ValidationError(_("La classe et la matière doivent appartenir au même établissement."))
+
+
+class DocumentDevoir(models.Model):
+    """Document importé pour un devoir, en plus de l'unique `CahierTexte.piece_jointe` — permet
+
+    d'attacher plusieurs documents (énoncé, corrigé, ressources...) à un même devoir.
+    """
+    cahier_texte = models.ForeignKey(
+        CahierTexte, on_delete=models.CASCADE, related_name='documents_importes', verbose_name=_('devoir')
+    )
+    nom = models.CharField(
+        _('nom'), max_length=150, blank=True, help_text=_("Nom affiché (par défaut, le nom du fichier).")
+    )
+    fichier = models.FileField(_('fichier'), upload_to='documents_devoirs/')
+    importe_par = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name='documents_devoirs_importes',
+        verbose_name=_('importé par')
+    )
+    date_import = models.DateTimeField(_("date d'import"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('document de devoir')
+        verbose_name_plural = _('documents de devoir')
+        ordering = ['-date_import']
+
+    def __str__(self):
+        return f"{self.nom or self.fichier.name} ({self.cahier_texte})"
 
 
 class RappelDevoirEnvoye(models.Model):
