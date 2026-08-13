@@ -3,9 +3,9 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import Annonce, Classe, Message, Notification, User
-from ..permissions import EcoleScopedQuerysetMixin, IsStaffPedagogique
-from ..serializers import AnnonceSerializer, MessageSerializer, NotificationSerializer
+from ..models import Annonce, Classe, Message, MessageGroupeClasse, Notification, User
+from ..permissions import CanAccessMessageGroupeClasse, EcoleScopedQuerysetMixin, IsStaffPedagogique
+from ..serializers import AnnonceSerializer, MessageGroupeClasseSerializer, MessageSerializer, NotificationSerializer
 
 
 class MessageViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -30,6 +30,40 @@ class MessageViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         message.est_lu = True
         message.save(update_fields=['est_lu'])
         return Response(MessageSerializer(message).data)
+
+
+class MessageGroupeClasseViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
+    """Chat de groupe classe + enseignant : chaque professeur a son propre fil de discussion
+
+    avec chacune de ses classes (élèves + parents). Pas de modification/suppression de
+    message une fois envoyé — uniquement liste et envoi.
+    """
+    http_method_names = ['get', 'post', 'head', 'options']
+    queryset = MessageGroupeClasse.objects.select_related('classe', 'enseignant', 'auteur')
+    serializer_class = MessageGroupeClasseSerializer
+    permission_classes = [permissions.IsAuthenticated, CanAccessMessageGroupeClasse]
+    ecole_field = 'classe__annee_scolaire__ecole_id'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if not user.is_superuser:
+            role = getattr(user, 'role', None)
+            if role == User.Role.ENSEIGNANT:
+                qs = qs.filter(enseignant=user)
+            elif role == User.Role.ETUDIANT:
+                qs = qs.filter(classe__inscriptions__etudiant__utilisateur=user).distinct()
+            elif role == User.Role.PARENT:
+                qs = qs.filter(classe__inscriptions__etudiant__tuteurs__parent=user).distinct()
+            # ADMIN / RESPONSABLE / SECRETARIAT : tout l'établissement (supervision)
+
+        classe_id = self.request.query_params.get('classe')
+        if classe_id:
+            qs = qs.filter(classe_id=classe_id)
+        enseignant_id = self.request.query_params.get('enseignant')
+        if enseignant_id:
+            qs = qs.filter(enseignant_id=enseignant_id)
+        return qs
 
 
 class AnnonceViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):

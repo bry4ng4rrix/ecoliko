@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from ..models import Annonce, Message, Notification
+from ..models import Annonce, Message, MessageGroupeClasse, Notification
 from .base import ValidatedModelSerializer
 
 
@@ -18,6 +18,25 @@ class MessageSerializer(ValidatedModelSerializer):
 
     def create(self, validated_data):
         validated_data['expediteur'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class MessageGroupeClasseSerializer(ValidatedModelSerializer):
+    classe_nom = serializers.CharField(source='classe.nom', read_only=True)
+    auteur_nom = serializers.CharField(source='auteur.get_full_name', read_only=True)
+    auteur_role = serializers.CharField(source='auteur.role', read_only=True)
+    auteur_photo = serializers.ImageField(source='auteur.photo', read_only=True, default=None)
+
+    class Meta:
+        model = MessageGroupeClasse
+        fields = (
+            'id', 'classe', 'classe_nom', 'enseignant', 'auteur', 'auteur_nom', 'auteur_role',
+            'auteur_photo', 'contenu', 'date_envoi',
+        )
+        read_only_fields = ('auteur', 'date_envoi')
+
+    def create(self, validated_data):
+        validated_data['auteur'] = self.context['request'].user
         return super().create(validated_data)
 
 

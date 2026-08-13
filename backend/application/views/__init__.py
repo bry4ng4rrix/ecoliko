@@ -12,7 +12,7 @@ from .finance import FraisScolariteViewSet, PaiementEcolageViewSet
 from .vie_scolaire import CahierTexteViewSet, EmploiDuTempsViewSet, PresenceCoursViewSet
 from .bulletin import BulletinViewSet
 from .documents import DemandeDocumentViewSet
-from .communication import AnnonceViewSet, MessageViewSet, NotificationViewSet
+from .communication import AnnonceViewSet, MessageGroupeClasseViewSet, MessageViewSet, NotificationViewSet
 from .audit import AuditLogViewSet
 from .statistiques import StatistiquesView
 from .discipline import EvenementDisciplinaireViewSet
@@ -31,7 +31,7 @@ __all__ = [
     'FraisScolariteViewSet', 'PaiementEcolageViewSet',
     'PresenceCoursViewSet', 'EmploiDuTempsViewSet', 'CahierTexteViewSet', 'BulletinViewSet',
     'DemandeDocumentViewSet',
-    'AnnonceViewSet', 'MessageViewSet', 'NotificationViewSet',
+    'AnnonceViewSet', 'MessageGroupeClasseViewSet', 'MessageViewSet', 'NotificationViewSet',
     'AuditLogViewSet', 'StatistiquesView', 'EvenementDisciplinaireViewSet',
     'DossierEnseignantViewSet', 'EvenementCalendrierViewSet', 'DocumentJustificatifEtudiantViewSet',
     'PieceJointeInscriptionViewSet', 'PaiementSalaireViewSet',

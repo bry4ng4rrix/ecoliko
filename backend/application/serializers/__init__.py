@@ -20,7 +20,7 @@ from .finance import (
 from .vie_scolaire import AppelDuJourSerializer, CahierTexteSerializer, EmploiDuTempsSerializer, PresenceCoursSerializer
 from .bulletin import BulletinSerializer, GenererBulletinSerializer
 from .documents import DemandeDocumentSerializer, RefuserDemandeSerializer
-from .communication import AnnonceSerializer, MessageSerializer, NotificationSerializer
+from .communication import AnnonceSerializer, MessageGroupeClasseSerializer, MessageSerializer, NotificationSerializer
 
 __all__ = [
     'CustomTokenObtainPairSerializer', 'DemandeInscriptionSerializer', 'RegisterSerializer',
@@ -34,5 +34,6 @@ __all__ = [
     'EmploiDuTempsSerializer', 'BulletinSerializer', 'GenererBulletinSerializer',
     'DemandeDocumentSerializer', 'RefuserDemandeSerializer',
     'DemandeInscriptionSuiviSerializer', 'PieceJointeInscriptionSerializer', 'DocumentJustificatifEtudiantSerializer',
-    'AnnonceSerializer', 'MessageSerializer', 'NotificationSerializer', 'PaiementSalaireSerializer',
+    'AnnonceSerializer', 'MessageGroupeClasseSerializer', 'MessageSerializer', 'NotificationSerializer',
+    'PaiementSalaireSerializer',
 ]

@@ -30,6 +30,7 @@ export const dossierEnseignantService = createResourceService("/dossiers-enseign
 export const paiementSalaireService = createResourceService("/paiements-salaire")
 export const evenementCalendrierService = createResourceService("/evenements-calendrier")
 export const documentEtudiantService = createResourceService("/documents-etudiants")
+export const messageGroupeClasseService = createResourceService("/messages-groupe-classe")
 
 export { authService } from "./authService"
 

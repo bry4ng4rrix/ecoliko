@@ -1142,6 +1142,39 @@ class Message(models.Model):
             raise ValidationError(_("L'expéditeur et le destinataire doivent appartenir au même établissement."))
 
 
+class MessageGroupeClasse(models.Model):
+    """Message dans le chat de groupe d'une classe, rattaché à l'enseignant qui l'anime : chaque
+
+    professeur dispose ainsi de son propre espace de discussion avec chacune de ses classes,
+    ouvert aux élèves de cette classe et à leurs parents (mêmes destinataires qu'une annonce de
+    portée CLASSE) — pratique pour échanger autour des devoirs envoyés à ce groupe.
+    """
+    classe = models.ForeignKey(
+        Classe, on_delete=models.CASCADE, related_name='messages_groupe', verbose_name=_('classe')
+    )
+    enseignant = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='messages_groupe_classes',
+        limit_choices_to={'role': User.Role.ENSEIGNANT}, verbose_name=_('enseignant'),
+    )
+    auteur = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='messages_groupe_envoyes', verbose_name=_('auteur')
+    )
+    contenu = models.TextField(_('contenu'))
+    date_envoi = models.DateTimeField(_("date d'envoi"), auto_now_add=True)
+
+    class Meta:
+        verbose_name = _('message de groupe (classe)')
+        verbose_name_plural = _('messages de groupe (classe)')
+        ordering = ['date_envoi']
+
+    def __str__(self):
+        return f"{self.classe} / {self.enseignant} — {self.auteur} : {self.contenu[:30]}"
+
+    def clean(self):
+        if self.classe_id and self.enseignant_id and self.classe.annee_scolaire.ecole_id != self.enseignant.ecole_id:
+            raise ValidationError(_("La classe et l'enseignant doivent appartenir au même établissement."))
+
+
 class Annonce(models.Model):
     """Annonce diffusée à un groupe de destinataires (établissement, classe, enseignants, parents)."""
 

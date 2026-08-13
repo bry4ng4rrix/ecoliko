@@ -142,6 +142,99 @@ class AnnonceApiTests(APITestCase):
         self.assertTrue(Notification.objects.filter(destinataire=etudiant_user, type_notification='ANNONCE').exists())
 
 
+class MessageGroupeClasseApiTests(APITestCase):
+    def _classe_avec_prof_et_eleve(self):
+        classe = f.make_classe()
+        ecole = classe.annee_scolaire.ecole
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=ecole)
+        etudiant_user = f.make_user(role=User.Role.ETUDIANT, ecole=ecole)
+        etudiant = f.make_etudiant(ecole=ecole, utilisateur=etudiant_user)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        return classe, prof, etudiant_user, etudiant
+
+    def test_enseignant_peut_envoyer_et_lire(self):
+        classe, prof, etudiant_user, _ = self._classe_avec_prof_et_eleve()
+        self.client.force_authenticate(user=prof)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Bonjour la classe !',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+        self.assertEqual(response.data['auteur_nom'], prof.get_full_name())
+
+        response = self.client.get('/api/messages-groupe-classe/', {'classe': classe.id, 'enseignant': prof.id})
+        self.assertEqual(len(response.data), 1)
+
+    def test_eleve_de_la_classe_peut_ecrire_et_lire(self):
+        from application.models import MessageGroupeClasse
+
+        classe, prof, etudiant_user, _ = self._classe_avec_prof_et_eleve()
+        MessageGroupeClasse.objects.create(classe=classe, enseignant=prof, auteur=prof, contenu='Consigne du jour.')
+
+        self.client.force_authenticate(user=etudiant_user)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': "J'ai une question.",
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+        response = self.client.get('/api/messages-groupe-classe/')
+        self.assertEqual(len(response.data), 2)
+
+    def test_parent_peut_lire_et_ecrire(self):
+        classe, prof, etudiant_user, etudiant = self._classe_avec_prof_et_eleve()
+        parent = f.make_user(role=User.Role.PARENT, ecole=classe.annee_scolaire.ecole)
+        TuteurEtudiant.objects.create(parent=parent, etudiant=etudiant, relation='MERE')
+
+        self.client.force_authenticate(user=parent)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Merci pour le suivi.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
+
+    def test_eleve_dune_autre_classe_ne_peut_ni_lire_ni_ecrire(self):
+        from application.models import MessageGroupeClasse
+
+        classe, prof, _, _ = self._classe_avec_prof_et_eleve()
+        MessageGroupeClasse.objects.create(classe=classe, enseignant=prof, auteur=prof, contenu='Pour ma classe.')
+
+        autre_classe = f.make_classe(annee_scolaire=classe.annee_scolaire)
+        autre_etudiant_user = f.make_user(role=User.Role.ETUDIANT, ecole=classe.annee_scolaire.ecole)
+        autre_etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole, utilisateur=autre_etudiant_user)
+        f.make_inscription(etudiant=autre_etudiant, classe=autre_classe)
+
+        self.client.force_authenticate(user=autre_etudiant_user)
+        response = self.client.get('/api/messages-groupe-classe/')
+        self.assertEqual(response.data, [])
+
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Intrusion.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_autre_enseignant_ne_peut_pas_ecrire_dans_le_chat_dun_collegue(self):
+        classe, prof, _, _ = self._classe_avec_prof_et_eleve()
+        autre_prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+        classe.enseignants.add(autre_prof)
+
+        self.client.force_authenticate(user=autre_prof)
+        response = self.client.post('/api/messages-groupe-classe/', {
+            'classe': classe.id, 'enseignant': prof.id, 'contenu': 'Je réponds à sa place.',
+        })
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_enseignant_ne_voit_que_ses_propres_chats(self):
+        from application.models import MessageGroupeClasse
+
+        classe, prof, _, _ = self._classe_avec_prof_et_eleve()
+        autre_prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+        MessageGroupeClasse.objects.create(classe=classe, enseignant=prof, auteur=prof, contenu='Mon chat.')
+        MessageGroupeClasse.objects.create(classe=classe, enseignant=autre_prof, auteur=autre_prof, contenu='Pas le mien.')
+
+        self.client.force_authenticate(user=prof)
+        response = self.client.get('/api/messages-groupe-classe/')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['contenu'], 'Mon chat.')
+
+
 class NotificationApiTests(APITestCase):
     def test_user_only_sees_his_own_notifications_and_can_mark_read(self):
         ecole = f.make_ecole()

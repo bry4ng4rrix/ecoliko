@@ -1,20 +1,60 @@
-import { useState } from 'react'
-import { Bell, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Bell, Camera, Loader2, Plus, ScanText, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateResource, useDeleteResource, useResourceList } from '@/hooks/useResource'
 import { cahierTexteService, classeService, envoyerRappelsDevoirs, matiereService } from '@/services'
 import { Button } from '@/components/ui/button'
+import { ChatClassePanel } from '@/components/pedagogie/ChatClassePanel'
 
 const EMPTY_FORM = {
   classe: '', matiere: '', travail_a_faire: '', date_echeance_travail: '', heure_echeance_travail: '', lien: '',
 }
 
+/** Décompte vers une échéance (date + heure), mis à jour chaque seconde. */
+function useCompteARebours(dateEcheance, heureEcheance) {
+  const [maintenant, setMaintenant] = useState(() => new Date())
+
+  useEffect(() => {
+    const intervalle = setInterval(() => setMaintenant(new Date()), 1000)
+    return () => clearInterval(intervalle)
+  }, [])
+
+  if (!dateEcheance) return null
+  const cible = new Date(`${dateEcheance}T${heureEcheance ? `${heureEcheance.slice(0, 5)}:00` : '23:59:59'}`)
+  const diffMs = cible.getTime() - maintenant.getTime()
+  if (diffMs <= 0) return { termine: true }
+
+  return {
+    termine: false,
+    jours: Math.floor(diffMs / 86400000),
+    heures: Math.floor((diffMs / 3600000) % 24),
+    minutes: Math.floor((diffMs / 60000) % 60),
+    secondes: Math.floor((diffMs / 1000) % 60),
+  }
+}
+
+function CompteARebours({ dateEcheance, heureEcheance }) {
+  const compte = useCompteARebours(dateEcheance, heureEcheance)
+  if (!compte) return null
+  if (compte.termine) {
+    return <span className="text-xs font-semibold text-red-600">Délai dépassé</span>
+  }
+  const parts = []
+  if (compte.jours > 0) parts.push(`${compte.jours}j`)
+  parts.push(`${String(compte.heures).padStart(2, '0')}h`)
+  parts.push(`${String(compte.minutes).padStart(2, '0')}min`)
+  if (compte.jours === 0) parts.push(`${String(compte.secondes).padStart(2, '0')}s`)
+  return <span className="text-xs font-semibold text-primary">{parts.join(' ')} restants</span>
+}
+
 /** Gestion des devoirs par l'enseignant : envoi par classe avec date/heure de rendu — basé sur
 
  * `CahierTexte.travail_a_faire`, donc automatiquement synchronisé au calendrier de la classe
- * et notifié aux élèves/parents (voir `services.devoirs` côté backend).
+ * et notifié aux élèves/parents (voir `services.devoirs` côté backend). Permet aussi de joindre
+ * une photo (galerie ou appareil photo) et d'extraire le texte d'un document scanné par OCR
+ * (Tesseract.js, exécuté entièrement dans le navigateur — aucune clé API requise).
  */
 export function DevoirsPanel() {
   const { user } = useAuth()
@@ -22,6 +62,10 @@ export function DevoirsPanel() {
   const [form, setForm] = useState(EMPTY_FORM)
   const [pieceJointe, setPieceJointe] = useState(null)
   const [envoiRappelsEnCours, setEnvoiRappelsEnCours] = useState(false)
+  const [ocrEnCours, setOcrEnCours] = useState(false)
+  const [classeChat, setClasseChat] = useState('')
+  const camInputRef = useRef(null)
+  const ocrInputRef = useRef(null)
 
   const { data: devoirsBruts, isLoading } = useResourceList('cahier-textes', cahierTexteService)
   const { data: classes } = useResourceList('classes', classeService)
@@ -87,6 +131,39 @@ export function DevoirsPanel() {
     }
   }
 
+  const handleScanOcr = async (e) => {
+    const fichier = e.target.files?.[0]
+    e.target.value = ''
+    if (!fichier) return
+
+    setOcrEnCours(true)
+    toast.info('Analyse du document en cours...')
+    try {
+      const { recognize } = await import('tesseract.js')
+      // Fichiers hébergés localement (public/tesseract/) plutôt que sur le CDN par défaut de
+      // Tesseract.js : évite toute dépendance à un réseau externe (jsdelivr) au moment du scan.
+      const { data } = await recognize(fichier, 'fra', {
+        workerPath: '/tesseract/worker.min.js',
+        corePath: '/tesseract/tesseract-core',
+        langPath: '/tesseract/lang-data',
+      })
+      const texte = data.text.trim()
+      if (!texte) {
+        toast.warning('Aucun texte détecté sur ce document.')
+        return
+      }
+      setForm((prev) => ({
+        ...prev, travail_a_faire: prev.travail_a_faire ? `${prev.travail_a_faire}\n${texte}` : texte,
+      }))
+      toast.success('Texte extrait et ajouté au devoir.')
+    } catch (err) {
+      console.error('Erreur OCR:', err)
+      toast.error(`Erreur lors de la lecture du document (OCR)${err?.message ? ` : ${err.message}` : ''}.`)
+    } finally {
+      setOcrEnCours(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start flex-wrap gap-3">
@@ -128,11 +205,26 @@ export function DevoirsPanel() {
               {mesMatieres.map((m) => <option key={m.id} value={m.id}>{m.intitule}</option>)}
             </select>
           </div>
-          <textarea
-            name="travail_a_faire" value={form.travail_a_faire} onChange={handleChange} required rows={3}
-            placeholder="Description du devoir..."
-            className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-muted-foreground">Description du devoir</label>
+              <input ref={ocrInputRef} type="file" accept="image/*" capture="environment" onChange={handleScanOcr} className="hidden" />
+              <Button
+                type="button" size="sm" variant="outline" className="gap-2 h-7 px-2 text-xs"
+                onClick={() => ocrInputRef.current?.click()} disabled={ocrEnCours}
+              >
+                {ocrEnCours ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ScanText className="w-3.5 h-3.5" />}
+                {ocrEnCours ? 'Analyse...' : 'Scanner un document (OCR)'}
+              </Button>
+            </div>
+            <textarea
+              name="travail_a_faire" value={form.travail_a_faire} onChange={handleChange} required rows={3}
+              placeholder="Description du devoir... (ou scannez un énoncé papier avec le bouton ci-dessus)"
+              className="w-full px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Date de rendu</label>
@@ -155,11 +247,25 @@ export function DevoirsPanel() {
               className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <div>
-              <label className="text-xs text-muted-foreground">Pièce jointe (optionnel)</label>
-              <input
-                type="file" onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)}
-                className="w-full text-sm file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground"
-              />
+              <label className="text-xs text-muted-foreground">
+                Pièce jointe (optionnel) {pieceJointe && <span className="text-primary">— {pieceJointe.name}</span>}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="file" onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)}
+                  className="flex-1 min-w-0 text-sm file:mr-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-primary file:text-primary-foreground"
+                />
+                <input
+                  ref={camInputRef} type="file" accept="image/*" capture="environment"
+                  onChange={(e) => setPieceJointe(e.target.files?.[0] ?? null)} className="hidden"
+                />
+                <Button
+                  type="button" size="sm" variant="outline" className="gap-2 flex-shrink-0"
+                  onClick={() => camInputRef.current?.click()}
+                >
+                  <Camera className="w-4 h-4" /> Photo
+                </Button>
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
@@ -180,10 +286,13 @@ export function DevoirsPanel() {
               <div className="flex-1">
                 <p className="font-semibold">{d.matiere_intitule} — {d.classe_nom}</p>
                 <p className="text-sm text-muted-foreground mt-1">{d.travail_a_faire}</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  À rendre le {d.date_echeance_travail}
-                  {d.heure_echeance_travail && ` à ${d.heure_echeance_travail.slice(0, 5)}`}
-                </p>
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    À rendre le {d.date_echeance_travail}
+                    {d.heure_echeance_travail && ` à ${d.heure_echeance_travail.slice(0, 5)}`}
+                  </p>
+                  <CompteARebours dateEcheance={d.date_echeance_travail} heureEcheance={d.heure_echeance_travail} />
+                </div>
                 {(d.piece_jointe || d.lien) && (
                   <div className="flex gap-3 mt-2">
                     {d.piece_jointe && (
@@ -205,6 +314,27 @@ export function DevoirsPanel() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h2 className="text-lg font-bold">Chat de classe</h2>
+          <select
+            value={classeChat} onChange={(e) => setClasseChat(e.target.value)}
+            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">Choisir une classe</option>
+            {(classes ?? []).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        </div>
+        {classeChat ? (
+          <ChatClassePanel
+            classeId={Number(classeChat)} enseignantId={user?.id}
+            classeNom={(classes ?? []).find((c) => c.id === Number(classeChat))?.nom ?? ''}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">Sélectionnez une classe pour ouvrir son chat de groupe.</p>
+        )}
       </div>
     </div>
   )

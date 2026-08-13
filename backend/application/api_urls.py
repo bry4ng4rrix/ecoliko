@@ -7,7 +7,8 @@ from .views import (
     ClasseViewSet, CustomTokenObtainPairView, DemandeDocumentViewSet, DemandeInscriptionViewSet,
     DocumentJustificatifEtudiantViewSet, DossierEnseignantViewSet, EcoleViewSet, EmploiDuTempsViewSet,
     EtudiantViewSet, EvenementCalendrierViewSet, EvenementDisciplinaireViewSet, FiliereViewSet,
-    FraisScolariteViewSet, InscriptionViewSet, MatiereViewSet, MessageViewSet, NiveauViewSet, NotificationViewSet,
+    FraisScolariteViewSet, InscriptionViewSet, MatiereViewSet, MessageGroupeClasseViewSet, MessageViewSet,
+    NiveauViewSet, NotificationViewSet,
     NoteViewSet, PaiementEcolageViewSet, PaiementSalaireViewSet, PieceJointeInscriptionViewSet,
     PresenceCoursViewSet, RegisterEcoleView, RegisterView, SalleViewSet, StaffViewSet, StatistiquesView,
     TrimestreViewSet, TuteurEtudiantViewSet, UserProfileView,
@@ -42,6 +43,7 @@ router.register('documents-etudiants', DocumentJustificatifEtudiantViewSet, base
 router.register('bulletins', BulletinViewSet, basename='bulletin')
 router.register('demandes-documents', DemandeDocumentViewSet, basename='demandedocument')
 router.register('messages', MessageViewSet, basename='message')
+router.register('messages-groupe-classe', MessageGroupeClasseViewSet, basename='messagegroupeclasse')
 router.register('annonces', AnnonceViewSet, basename='annonce')
 router.register('notifications', NotificationViewSet, basename='notification')
 router.register('audit-logs', AuditLogViewSet, basename='auditlog')

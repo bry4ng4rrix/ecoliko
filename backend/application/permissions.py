@@ -179,6 +179,37 @@ class CanManageCahierTexte(CanManageMatiereScopedResource):
     pass
 
 
+class CanAccessMessageGroupeClasse(permissions.BasePermission):
+    """Chat de groupe (classe + enseignant) : accessible en lecture/écriture par l'enseignant
+
+    concerné, les élèves de la classe et leurs parents. Le personnel (admin/secrétariat/
+    responsable) peut consulter (supervision) via `get_queryset`, mais n'écrit pas ici.
+    """
+
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        if view.action != 'create':
+            return True  # list/retrieve : borné par get_queryset du ViewSet
+
+        from .models import Etudiant
+
+        role = getattr(user, 'role', None)
+        classe_id = request.data.get('classe')
+        if role == 'ENSEIGNANT':
+            return str(user.id) == str(request.data.get('enseignant'))
+        if role == 'ETUDIANT':
+            return Etudiant.objects.filter(utilisateur=user, inscriptions__classe_id=classe_id).exists()
+        if role == 'PARENT':
+            return Etudiant.objects.filter(
+                tuteurs__parent=user, inscriptions__classe_id=classe_id
+            ).exists()
+        return False
+
+
 class IsSameEcole(permissions.BasePermission):
     """Vérification au niveau objet : l'objet doit appartenir à l'établissement de l'utilisateur."""
 
