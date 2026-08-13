@@ -277,8 +277,13 @@ const JOURS_SEMAINE = [
 
 function MonEmploiDuTempsPanel() {
   const { data: emploiDuTemps, isLoading } = useResourceList('emplois-du-temps', emploiDuTempsService)
+  const [filtreClasse, setFiltreClasse] = useState('')
 
-  const creneaux = [...new Set((emploiDuTemps ?? []).map((s) => `${s.heure_debut}|${s.heure_fin}`))]
+  const mesClasses = [...new Set((emploiDuTemps ?? []).map((s) => s.classe_nom))].sort()
+
+  const slotsFiltres = (emploiDuTemps ?? []).filter((s) => !filtreClasse || s.classe_nom === filtreClasse)
+
+  const creneaux = [...new Set(slotsFiltres.map((s) => `${s.heure_debut}|${s.heure_fin}`))]
     .sort()
     .map((cle) => {
       const [heure_debut, heure_fin] = cle.split('|')
@@ -286,13 +291,22 @@ function MonEmploiDuTempsPanel() {
     })
 
   const slotAt = (jour, heure_debut) =>
-    (emploiDuTemps ?? []).find((s) => s.jour === jour && s.heure_debut === heure_debut)
+    slotsFiltres.find((s) => s.jour === jour && s.heure_debut === heure_debut)
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Emploi du Temps</h1>
-        <p className="text-muted-foreground mt-1">Votre planning hebdomadaire de cours</p>
+      <div className="flex justify-between items-start flex-wrap gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Emploi du Temps</h1>
+          <p className="text-muted-foreground mt-1">Votre planning hebdomadaire de cours</p>
+        </div>
+        <select
+          value={filtreClasse} onChange={(e) => setFiltreClasse(e.target.value)}
+          className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+        >
+          <option value="">Toutes mes classes</option>
+          {mesClasses.map((nom) => <option key={nom} value={nom}>{nom}</option>)}
+        </select>
       </div>
 
       <div className="bg-card rounded-lg border border-border overflow-x-auto">
