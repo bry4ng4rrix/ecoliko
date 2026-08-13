@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Lock, Mail, BookOpen, Loader2 } from 'lucide-react'
+import { Lock, Mail, BookOpen, Loader2, AlertCircle } from 'lucide-react'
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
