@@ -157,14 +157,39 @@ class EtudiantViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
 
 
 class InscriptionViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
+    """Un étudiant/parent peut consulter (lecture seule) les inscriptions de son propre
+
+    dossier / celui de ses enfants — nécessaire pour calculer les tarifs d'écolage côté
+    élève/parent (classe, niveau, filière de l'inscription active). L'écriture reste
+    réservée à l'admin/secrétariat, la lecture "large" (tout établissement) au personnel
+    pédagogique.
+    """
     queryset = Inscription.objects.select_related('etudiant', 'classe', 'annee_scolaire')
     serializer_class = InscriptionSerializer
-    permission_classes = [permissions.IsAuthenticated, IsStaffPedagogique]
+    permission_classes = [permissions.IsAuthenticated]
     ecole_field = 'etudiant__ecole_id'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+
+        role = getattr(user, 'role', None)
+        if role == User.Role.ETUDIANT:
+            return qs.filter(etudiant__utilisateur=user)
+        if role == User.Role.PARENT:
+            return qs.filter(etudiant__tuteurs__parent=user).distinct()
+        return qs  # ADMIN / RESPONSABLE / ENSEIGNANT / SECRETARIAT : cf. get_permissions
 
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy'):
             return [permissions.IsAuthenticated(), IsAdminOrSecretariat()]
+        if self.action in ('list', 'retrieve'):
+            role = getattr(self.request.user, 'role', None)
+            if role in (User.Role.ETUDIANT, User.Role.PARENT):
+                return [permissions.IsAuthenticated()]
+            return [permissions.IsAuthenticated(), IsStaffPedagogique()]
         return [permissions.IsAuthenticated(), IsStaffPedagogique()]
 
 

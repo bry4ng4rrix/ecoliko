@@ -442,6 +442,71 @@ class SallePermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
 
+class InscriptionPermissionTests(APITestCase):
+    """Un élève/parent doit pouvoir lire (pas écrire) les inscriptions de son propre dossier —
+
+    nécessaire pour calculer les tarifs d'écolage côté élève/parent (classe de l'inscription
+    active). Régression : ce endpoint était auparavant fermé à ces deux rôles, y compris pour
+    leurs propres données, ce qui cassait le calendrier des paiements du tableau de bord Parent.
+    """
+
+    def test_etudiant_voit_sa_propre_inscription(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        eleve = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.utilisateur = eleve
+        etudiant.save()
+        self.client.force_authenticate(user=eleve)
+
+        response = self.client.get('/api/inscriptions/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({i['etudiant'] for i in response.data}, {etudiant.id})
+
+    def test_parent_voit_uniquement_les_inscriptions_de_son_enfant(self):
+        classe = f.make_classe()
+        mon_enfant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        autre_enfant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=mon_enfant, classe=classe)
+        f.make_inscription(etudiant=autre_enfant, classe=classe)
+        parent = f.make_user(role=User.Role.PARENT, ecole=classe.annee_scolaire.ecole)
+
+        from application.models import TuteurEtudiant
+        TuteurEtudiant.objects.create(parent=parent, etudiant=mon_enfant, relation='PERE')
+        self.client.force_authenticate(user=parent)
+
+        response = self.client.get('/api/inscriptions/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({i['etudiant'] for i in response.data}, {mon_enfant.id})
+
+    def test_etudiant_ne_peut_pas_creer_inscription(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        eleve = f.make_user(role=User.Role.ETUDIANT, ecole=etudiant.ecole)
+        etudiant.utilisateur = eleve
+        etudiant.save()
+        self.client.force_authenticate(user=eleve)
+
+        response = self.client.post('/api/inscriptions/', {
+            'etudiant': etudiant.id, 'classe': classe.id, 'annee_scolaire': classe.annee_scolaire.id,
+        }, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_enseignant_garde_l_acces_complet_etablissement(self):
+        """Le personnel pédagogique n'est pas affecté par ce correctif : il continue de voir
+
+        toutes les inscriptions de son établissement (nécessaire à `classes_du_professeur` etc.)."""
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        prof = f.make_user(role=User.Role.ENSEIGNANT, ecole=classe.annee_scolaire.ecole)
+        self.client.force_authenticate(user=prof)
+
+        response = self.client.get('/api/inscriptions/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual({i['etudiant'] for i in response.data}, {etudiant.id})
+
+
 class ClassePermissionTests(APITestCase):
     def test_enseignant_cannot_create_classe(self):
         classe = f.make_classe()
