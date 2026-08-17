@@ -52,6 +52,8 @@ dependencies:
   image_picker: ^1.1.2
   file_picker: ^8.1.6
   url_launcher: ^6.3.1
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
 
   # Nombres/dates formatés, "il y a 5 min", etc.
   timeago: ^3.7.0
