@@ -541,6 +541,34 @@ function GradesResults() {
     ? lignes.reduce((best, l) => (l.moyenne > best.moyenne ? l : best), lignes[0])
     : null
 
+  // Moyenne pondérée d'un trimestre (par coefficient de matière) — même calcul que le backend (services/moyenne.py).
+  const moyennePondereeTrimestre = (trimestreId) => {
+    const parMatiere = {}
+    for (const n of notes ?? []) {
+      if (n.trimestre !== trimestreId) continue
+      if (!parMatiere[n.matiere]) parMatiere[n.matiere] = []
+      parMatiere[n.matiere].push(Number(n.valeur))
+    }
+    let totalPondere = 0
+    let totalCoefficients = 0
+    for (const [matiereId, valeurs] of Object.entries(parMatiere)) {
+      const coefficient = matieres?.find((m) => m.id === Number(matiereId))?.coefficient ?? 1
+      const moyenneMatiere = valeurs.reduce((s, v) => s + v, 0) / valeurs.length
+      totalPondere += moyenneMatiere * coefficient
+      totalCoefficients += coefficient
+    }
+    // Arrondi à 2 décimales ici, comme services/moyenne.py::moyenne_trimestre — la moyenne annuelle
+    // du backend moyenne des valeurs déjà arrondies, pas les valeurs à pleine précision.
+    return totalCoefficients > 0 ? Math.round((totalPondere / totalCoefficients) * 100) / 100 : null
+  }
+
+  const moyennesTrimestres = (trimestres ?? [])
+    .map((t) => moyennePondereeTrimestre(t.id))
+    .filter((m) => m != null)
+  const moyenneAnnuelle = moyennesTrimestres.length > 0
+    ? moyennesTrimestres.reduce((s, m) => s + m, 0) / moyennesTrimestres.length
+    : null
+
   return (
     <div className="space-y-6">
       <div>
@@ -592,14 +620,23 @@ function GradesResults() {
       </div>
 
       {/* Overall Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card rounded-lg border border-border p-6">
-          <p className="text-sm text-muted-foreground">Moyenne générale pondérée</p>
+          <p className="text-sm text-muted-foreground">Moyenne du trimestre</p>
           <p className="text-3xl font-bold mt-2">{moyenneGenerale != null ? `${moyenneGenerale}/20` : '—'}</p>
         </div>
         <div className="bg-card rounded-lg border border-border p-6">
           <p className="text-sm text-muted-foreground">Meilleure matière</p>
           <p className="text-3xl font-bold mt-2">{meilleureMatiere ? nomMatiere(meilleureMatiere.matiereId) : '—'}</p>
+        </div>
+        <div className="bg-primary/5 rounded-lg border border-primary/30 p-6">
+          <p className="text-sm text-muted-foreground">Moyenne générale annuelle</p>
+          <p className="text-3xl font-bold mt-2 text-primary">{moyenneAnnuelle != null ? `${moyenneAnnuelle.toFixed(2)}/20` : '—'}</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {moyennesTrimestres.length > 0
+              ? `Moyenne des ${moyennesTrimestres.length} trimestre${moyennesTrimestres.length > 1 ? 's' : ''} noté${moyennesTrimestres.length > 1 ? 's' : ''}`
+              : 'Aucune note enregistrée'}
+          </p>
         </div>
       </div>
 
