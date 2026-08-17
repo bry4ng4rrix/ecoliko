@@ -8,9 +8,12 @@ import {
   Calendar, CheckCircle, AlertCircle, Home, Layers, Gauge, Database, UserPlus, ShieldAlert
 } from 'lucide-react'
 
+import { useQuery } from '@tanstack/react-query'
+
 import { useAuth } from '@/hooks/useAuth'
+import { useAnneeActive } from '@/hooks/useAnneeActive'
 import { useResourceList } from '@/hooks/useResource'
-import { classeService, etudiantService, staffService } from '@/services'
+import { classeService, etudiantService, fetchStatistiques, staffService } from '@/services'
 import { NotificationBell } from '@/components/NotificationBell'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { AnnoncesPanel } from '@/components/communication/AnnoncesPanel'
@@ -71,8 +74,16 @@ function AdminDashboard() {
     const { data: etudiants, isLoading: loadingEtudiants } = useResourceList('etudiants', etudiantService)
     const { data: personnel, isLoading: loadingPersonnel } = useResourceList('personnel', staffService)
     const { data: classes, isLoading: loadingClasses } = useResourceList('classes', classeService)
+    const anneeActive = useAnneeActive()
 
     const nbEnseignants = personnel?.filter((p) => p.role === 'ENSEIGNANT').length
+
+    // Taux de réussite = part des élèves dont la moyenne générale annuelle (3 trimestres) atteint 10/20.
+    const { data: stats, isLoading: loadingStats } = useQuery({
+      queryKey: ['statistiques', anneeActive?.id],
+      queryFn: () => fetchStatistiques(anneeActive.id),
+      enabled: Boolean(anneeActive?.id),
+    })
 
     return (
       <div className="space-y-6">
@@ -81,7 +92,7 @@ function AdminDashboard() {
           <p className="text-muted-foreground mt-1">Bienvenue sur la plateforme SIG-Lycée</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <StatCard
             title="Élèves inscrits"
             value={loadingEtudiants ? '…' : (etudiants?.length ?? 0).toLocaleString()}
@@ -96,6 +107,12 @@ function AdminDashboard() {
             title="Classes actives"
             value={loadingClasses ? '…' : (classes?.length ?? 0).toLocaleString()}
             icon={Layers}
+          />
+          <StatCard
+            title="Taux de réussite"
+            value={loadingStats ? '…' : (stats?.taux_reussite != null ? `${stats.taux_reussite}%` : '—')}
+            subtitle={stats?.nb_evalues ? `${stats.nb_evalues} élève${stats.nb_evalues > 1 ? 's' : ''} évalué${stats.nb_evalues > 1 ? 's' : ''}` : undefined}
+            icon={Gauge}
           />
         </div>
 
@@ -455,7 +472,7 @@ function AdminDashboard() {
   )
 }
 
-function StatCard({ title, value, change, icon: Icon, trend }) {
+function StatCard({ title, value, change, icon: Icon, trend, subtitle }) {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow">
       <CardContent className="p-6">
@@ -468,6 +485,9 @@ function StatCard({ title, value, change, icon: Icon, trend }) {
                 {trend === 'up' ? <TrendingUp className="w-3 h-3 text-green-500" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
                 <p className={`text-[10px] font-semibold ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>{change}</p>
               </div>
+            )}
+            {!trend && subtitle && (
+              <p className="text-[10px] font-medium text-muted-foreground">{subtitle}</p>
             )}
           </div>
           <div className="bg-indigo-50 dark:bg-indigo-950/50 rounded-xl p-3 border border-indigo-100/50 dark:border-indigo-900/30">
