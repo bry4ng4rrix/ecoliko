@@ -43,7 +43,7 @@ class GenererBulletinServiceTests(APITestCase):
         bulletin = generer_bulletin(etudiant, annee, trimestre=None)
 
         self.assertEqual(bulletin.moyenne_generale, Decimal('8.00'))
-        self.assertEqual(bulletin.decision, Bulletin.Decision.AJOURNE)
+        self.assertEqual(bulletin.decision, Bulletin.Decision.REDOUBLE)
 
     def test_regenerating_updates_existing_bulletin_instead_of_duplicating(self):
         classe = f.make_classe()

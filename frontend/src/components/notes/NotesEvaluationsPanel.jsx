@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { useResourceList } from '@/hooks/useResource'
-import { classeService, fetchClassement, trimestreService } from '@/services'
+import { classeService, fetchClassement, fetchClassementAnnuel, trimestreService } from '@/services'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { DataTable } from '@/components/ui/data-table'
 
 const FILTRES_REUSSITE = [
@@ -16,6 +17,7 @@ export function NotesEvaluationsPanel() {
   const [classeId, setClasseId] = useState('')
   const [trimestreId, setTrimestreId] = useState('')
   const [filtreReussite, setFiltreReussite] = useState('')
+  const [vue, setVue] = useState('trimestriel') // 'trimestriel' | 'annuel'
 
   const { data: classes } = useResourceList('classes', classeService)
   const { data: trimestres } = useResourceList('trimestres', trimestreService)
@@ -37,11 +39,20 @@ export function NotesEvaluationsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classeSelectionnee?.id, trimestres])
 
-  const { data: classement, isLoading } = useQuery({
+  const { data: classementTrimestriel, isLoading: chargeTrimestriel } = useQuery({
     queryKey: ['classement', classeId, trimestreId],
     queryFn: () => fetchClassement(Number(classeId), Number(trimestreId)),
-    enabled: Boolean(classeId && trimestreId),
+    enabled: vue === 'trimestriel' && Boolean(classeId && trimestreId),
   })
+  const { data: classementAnnuel, isLoading: chargeAnnuel } = useQuery({
+    queryKey: ['classement-annuel', classeId],
+    queryFn: () => fetchClassementAnnuel(Number(classeId)),
+    enabled: vue === 'annuel' && Boolean(classeId),
+  })
+
+  const classement = vue === 'annuel' ? classementAnnuel : classementTrimestriel
+  const isLoading = vue === 'annuel' ? chargeAnnuel : chargeTrimestriel
+  const pretAAfficher = vue === 'annuel' ? Boolean(classeId) : Boolean(classeId && trimestreId)
 
   const lignes = useMemo(() => {
     const source = classement ?? []
@@ -57,23 +68,23 @@ export function NotesEvaluationsPanel() {
     { accessorKey: 'rang', header: 'Rang' },
     { accessorKey: 'nom_complet', header: 'Élève' },
     {
-      accessorKey: 'moyenne', header: 'Moyenne',
+      accessorKey: 'moyenne', header: vue === 'annuel' ? 'Moyenne générale annuelle' : 'Moyenne',
       cell: ({ row }) => row.original.moyenne === null || row.original.moyenne === undefined
         ? <span className="text-muted-foreground">—</span>
         : <span className="font-mono">{Number(row.original.moyenne).toFixed(2)} / 20</span>,
     },
     {
-      id: 'statut', header: 'Statut', enableSorting: false,
+      id: 'statut', header: vue === 'annuel' ? 'Décision' : 'Statut', enableSorting: false,
       cell: ({ row }) => {
         const moyenne = row.original.moyenne === null || row.original.moyenne === undefined ? null : Number(row.original.moyenne)
         if (moyenne === null) return <Badge variant="secondary">Pas de notes</Badge>
         return moyenne >= 10
-          ? <Badge className="bg-green-600 hover:bg-green-600">Admis</Badge>
+          ? <Badge className="bg-green-600 hover:bg-green-600">{vue === 'annuel' ? 'Passant' : 'Admis'}</Badge>
           : <Badge variant="destructive">Redouble</Badge>
       },
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [])
+  ], [vue])
 
   const effectifAdmis = (classement ?? []).filter((l) => l.moyenne !== null && Number(l.moyenne) >= 10).length
   const effectifRedouble = (classement ?? []).filter((l) => l.moyenne !== null && Number(l.moyenne) < 10).length
@@ -82,7 +93,20 @@ export function NotesEvaluationsPanel() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Notes & Évaluations</h1>
-        <p className="text-muted-foreground mt-1">Classement et moyennes par classe et par trimestre</p>
+        <p className="text-muted-foreground mt-1">
+          {vue === 'annuel'
+            ? 'Bilan annuel : moyenne générale des 3 trimestres et décision de passage en classe supérieure.'
+            : 'Classement et moyennes par classe et par trimestre'}
+        </p>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="button" size="sm" variant={vue === 'trimestriel' ? 'default' : 'outline'} onClick={() => setVue('trimestriel')}>
+          Par trimestre
+        </Button>
+        <Button type="button" size="sm" variant={vue === 'annuel' ? 'default' : 'outline'} onClick={() => setVue('annuel')}>
+          Bilan annuel (passage / redoublement)
+        </Button>
       </div>
 
       <div className="bg-card rounded-lg border border-border p-6 flex flex-wrap gap-4 items-end">
@@ -95,18 +119,20 @@ export function NotesEvaluationsPanel() {
             {(classes ?? []).map((c) => <option key={c.id} value={c.id}>{c.nom}</option>)}
           </select>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-muted-foreground mb-1">Trimestre</label>
-          <select
-            value={trimestreId} onChange={(e) => setTrimestreId(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Choisir un trimestre</option>
-            {trimestresDeLaClasse.map((t) => (
-              <option key={t.id} value={t.id}>Trimestre {t.numero}{t.est_actif ? ' (actif)' : ''}</option>
-            ))}
-          </select>
-        </div>
+        {vue === 'trimestriel' && (
+          <div>
+            <label className="block text-xs font-semibold text-muted-foreground mb-1">Trimestre</label>
+            <select
+              value={trimestreId} onChange={(e) => setTrimestreId(e.target.value)}
+              className="px-3 py-2 rounded-lg bg-muted border border-border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Choisir un trimestre</option>
+              {trimestresDeLaClasse.map((t) => (
+                <option key={t.id} value={t.id}>Trimestre {t.numero}{t.est_actif ? ' (actif)' : ''}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-semibold text-muted-foreground mb-1">Réussite</label>
           <select
@@ -118,14 +144,14 @@ export function NotesEvaluationsPanel() {
         </div>
       </div>
 
-      {classeId && trimestreId && (
+      {pretAAfficher && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-card rounded-lg border border-border p-6">
             <p className="text-sm text-muted-foreground">Élèves de la classe</p>
             <p className="text-3xl font-bold mt-2">{(classement ?? []).length}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-6">
-            <p className="text-sm text-muted-foreground">Admis (≥ 10)</p>
+            <p className="text-sm text-muted-foreground">{vue === 'annuel' ? 'Passants (≥ 10)' : 'Admis (≥ 10)'}</p>
             <p className="text-3xl font-bold mt-2 text-green-600">{effectifAdmis}</p>
           </div>
           <div className="bg-card rounded-lg border border-border p-6">
@@ -136,8 +162,10 @@ export function NotesEvaluationsPanel() {
       )}
 
       <div className="bg-card rounded-lg border border-border p-6">
-        {!classeId || !trimestreId ? (
-          <p className="text-sm text-muted-foreground">Choisissez une classe et un trimestre pour voir le classement.</p>
+        {!pretAAfficher ? (
+          <p className="text-sm text-muted-foreground">
+            {vue === 'annuel' ? 'Choisissez une classe pour voir le bilan annuel.' : 'Choisissez une classe et un trimestre pour voir le classement.'}
+          </p>
         ) : (
           <DataTable
             columns={columns}

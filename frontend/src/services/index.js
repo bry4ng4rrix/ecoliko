@@ -147,6 +147,13 @@ export async function fetchClassement(classeId, trimestreId) {
   return data
 }
 
+/** Bilan annuel d'une classe (moyenne générale des 3 trimestres) : décision de passage/redoublement. */
+export async function fetchClassementAnnuel(classeId) {
+  if (!classeId) return []
+  const { data } = await apiClient.get(`/classes/${classeId}/classement-annuel/`)
+  return data
+}
+
 /** Synthèse statistique de l'établissement (effectifs, moyennes, taux de réussite/présence). */
 export async function fetchStatistiques(anneeScolaireId, trimestreId) {
   if (!anneeScolaireId) return null

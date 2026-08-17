@@ -121,3 +121,22 @@ class ClasseViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
             {'rang': rang, 'etudiant': etudiant.id, 'nom_complet': etudiant.get_full_name(), 'moyenne': moy}
             for rang, etudiant, moy in resultats
         ])
+
+    @action(detail=True, methods=['get'], url_path='classement-annuel')
+    def classement_annuel(self, request, pk=None):
+        """Bilan annuel de la classe (moyenne générale des 3 trimestres) et décision de passage.
+
+        Moyenne générale < 10 ⇒ redouble, sinon admis (passe en classe supérieure).
+        """
+        classe = self.get_object()
+        resultats = moyenne_service.classement_annuel(classe, classe.annee_scolaire)
+        return Response([
+            {
+                'rang': rang,
+                'etudiant': etudiant.id,
+                'nom_complet': etudiant.get_full_name(),
+                'moyenne': moy,
+                'decision': 'ADMIS' if moy is not None and moy >= 10 else ('REDOUBLE' if moy is not None else None),
+            }
+            for rang, etudiant, moy in resultats
+        ])

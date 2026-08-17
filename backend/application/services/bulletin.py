@@ -26,21 +26,10 @@ def _mention_pour(moyenne):
 
 
 def _decision_pour(moyenne):
+    """Décision de passage annuel : moyenne générale (3 trimestres) < 10 ⇒ redouble."""
     if moyenne is None:
         return Bulletin.Decision.NON_APPLICABLE
-    return Bulletin.Decision.ADMIS if moyenne >= 10 else Bulletin.Decision.AJOURNE
-
-
-def _classement_annuel(classe, annee_scolaire):
-    """Classement basé sur la moyenne générale annuelle (indépendant de `moyenne.classement`,
-
-    qui classe par trimestre)."""
-    etudiants = Etudiant.objects.filter(
-        inscriptions__classe=classe, inscriptions__annee_scolaire=annee_scolaire
-    ).distinct()
-    resultats = [(e, moyenne_service.moyenne_generale(e, annee_scolaire)) for e in etudiants]
-    resultats.sort(key=lambda pair: (pair[1] is None, -(pair[1] or Decimal('0'))))
-    return [(rang, e, m) for rang, (e, m) in enumerate(resultats, start=1)]
+    return Bulletin.Decision.ADMIS if moyenne >= 10 else Bulletin.Decision.REDOUBLE
 
 
 @transaction.atomic
@@ -59,7 +48,7 @@ def generer_bulletin(etudiant: Etudiant, annee_scolaire, trimestre=None) -> Bull
         classement = moyenne_service.classement(classe, trimestre)
     else:
         moyenne = moyenne_service.moyenne_generale(etudiant, annee_scolaire)
-        classement = _classement_annuel(classe, annee_scolaire)
+        classement = moyenne_service.classement_annuel(classe, annee_scolaire)
 
     rang = next((rang for rang, e, _ in classement if e.id == etudiant.id), None)
 

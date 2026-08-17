@@ -58,6 +58,21 @@ def moyenne_generale(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> Optio
     return _round2(sum(moyennes, Decimal('0')) / len(moyennes))
 
 
+def classement_annuel(classe: Classe, annee_scolaire: AnneeScolaire) -> list:
+    """Classement annuel des étudiants d'une classe, sur la moyenne générale des 3 trimestres.
+
+    Sert de base à la décision de passage/redoublement (règle : moyenne générale < 10 ⇒ redouble).
+    """
+    etudiants = Etudiant.objects.filter(
+        inscriptions__classe=classe, inscriptions__annee_scolaire=annee_scolaire
+    ).distinct()
+
+    resultats = [(etudiant, moyenne_generale(etudiant, annee_scolaire)) for etudiant in etudiants]
+    resultats.sort(key=lambda pair: (pair[1] is None, -(pair[1] or Decimal('0'))))
+
+    return [(rang, etudiant, moyenne) for rang, (etudiant, moyenne) in enumerate(resultats, start=1)]
+
+
 def classement(classe: Classe, trimestre: Trimestre) -> list:
     """Classement des étudiants actifs d'une classe pour un trimestre, du meilleur au moins bon.
 

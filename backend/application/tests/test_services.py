@@ -92,6 +92,51 @@ class ClassementTests(TestCase):
         self.assertEqual(resultats[0][0], 1)
 
 
+class ClassementAnnuelTests(TestCase):
+    def test_orders_by_moyenne_generale_across_trimestres(self):
+        classe = f.make_classe()
+        annee = classe.annee_scolaire
+        t1 = f.make_trimestre(annee_scolaire=annee, numero=1)
+        t2 = f.make_trimestre(annee_scolaire=annee, numero=2)
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau, coefficient=1)
+
+        bon = f.make_etudiant(ecole=annee.ecole)
+        faible = f.make_etudiant(ecole=annee.ecole)
+        f.make_inscription(etudiant=bon, classe=classe)
+        f.make_inscription(etudiant=faible, classe=classe)
+
+        from application.models import Note
+        Note.objects.create(etudiant=bon, matiere=matiere, trimestre=t1, valeur=16, type_evaluation='CC')
+        Note.objects.create(etudiant=bon, matiere=matiere, trimestre=t2, valeur=14, type_evaluation='CC')
+        Note.objects.create(etudiant=faible, matiere=matiere, trimestre=t1, valeur=8, type_evaluation='CC')
+        Note.objects.create(etudiant=faible, matiere=matiere, trimestre=t2, valeur=7, type_evaluation='CC')
+
+        resultats = moyenne.classement_annuel(classe, annee)
+
+        self.assertEqual([e for _, e, _ in resultats], [bon, faible])
+        self.assertEqual(resultats[0], (1, bon, Decimal('15.00')))
+        self.assertEqual(resultats[1], (2, faible, Decimal('7.50')))
+
+    def test_student_without_notes_ranked_last(self):
+        classe = f.make_classe()
+        annee = classe.annee_scolaire
+        t1 = f.make_trimestre(annee_scolaire=annee, numero=1)
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau, coefficient=1)
+
+        note = f.make_etudiant(ecole=annee.ecole)
+        sans_note = f.make_etudiant(ecole=annee.ecole)
+        f.make_inscription(etudiant=note, classe=classe)
+        f.make_inscription(etudiant=sans_note, classe=classe)
+
+        from application.models import Note
+        Note.objects.create(etudiant=note, matiere=matiere, trimestre=t1, valeur=12, type_evaluation='CC')
+
+        resultats = moyenne.classement_annuel(classe, annee)
+
+        self.assertEqual([e for _, e, _ in resultats], [note, sans_note])
+        self.assertIsNone(resultats[1][2])
+
+
 class ScopingTests(TestCase):
     def test_classes_du_professeur_matches_filiere_niveau_pair(self):
         classe = f.make_classe()

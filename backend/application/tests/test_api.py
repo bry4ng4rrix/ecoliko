@@ -526,6 +526,52 @@ class ClassePermissionTests(APITestCase):
         self.assertEqual(ids, {classe_a.id})
 
 
+class ClassementAnnuelApiTests(APITestCase):
+    """Bilan annuel (passage/redoublement) d'une classe : GET /classes/<id>/classement-annuel/."""
+
+    def test_returns_moyenne_and_decision_per_etudiant(self):
+        from application.models import Note
+
+        classe = f.make_classe()
+        annee = classe.annee_scolaire
+        t1 = f.make_trimestre(annee_scolaire=annee, numero=1)
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau, coefficient=1)
+
+        admis = f.make_etudiant(ecole=annee.ecole)
+        redouble = f.make_etudiant(ecole=annee.ecole)
+        f.make_inscription(etudiant=admis, classe=classe)
+        f.make_inscription(etudiant=redouble, classe=classe)
+        Note.objects.create(etudiant=admis, matiere=matiere, trimestre=t1, valeur=15, type_evaluation='CC')
+        Note.objects.create(etudiant=redouble, matiere=matiere, trimestre=t1, valeur=6, type_evaluation='CC')
+
+        admin = f.make_user(role=User.Role.ADMIN, ecole=annee.ecole)
+        self.client.force_authenticate(user=admin)
+        response = self.client.get(f'/api/classes/{classe.id}/classement-annuel/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        par_etudiant = {row['etudiant']: row for row in response.data}
+        self.assertEqual(par_etudiant[admis.id]['decision'], 'ADMIS')
+        self.assertEqual(par_etudiant[redouble.id]['decision'], 'REDOUBLE')
+
+    def test_etudiant_sans_note_a_une_decision_nulle(self):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+
+        admin = f.make_user(role=User.Role.ADMIN, ecole=classe.annee_scolaire.ecole)
+        self.client.force_authenticate(user=admin)
+        response = self.client.get(f'/api/classes/{classe.id}/classement-annuel/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertIsNone(response.data[0]['decision'])
+        self.assertIsNone(response.data[0]['moyenne'])
+
+    def test_requires_authentication(self):
+        classe = f.make_classe()
+        response = self.client.get(f'/api/classes/{classe.id}/classement-annuel/')
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
 class MatierePermissionTests(APITestCase):
     """Le catalogue des matières est géré par l'admin/le bureau ; un enseignant peut
 
