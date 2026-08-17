@@ -35,6 +35,24 @@ class ApiClient {
 
   static final ApiClient instance = ApiClient._internal();
   late final Dio dio;
+
+  /// Origine du serveur (schéma+hôte+port, sans `/api`) — pour résoudre une URL de média
+  /// relative (ex. `/media/photos_profils/x.jpg`) que le backend pourrait renvoyer sans la
+  /// construire en absolu. DRF le fait normalement via `request.build_absolute_uri()`, mais
+  /// s'appuyer uniquement sur ça est fragile (dépend du header Host reçu) — donc on résout
+  /// nous-mêmes côté client par sécurité.
+  String get mediaOrigin {
+    final uri = Uri.parse(dio.options.baseUrl);
+    return '${uri.scheme}://${uri.authority}';
+  }
+
+  /// Renvoie une URL de média absolue et chargeable par `NetworkImage`, que [path] soit déjà
+  /// absolu ou relatif (voire vide/null, auquel cas `null` est renvoyé).
+  String? resolveMediaUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return path.startsWith('/') ? '$mediaOrigin$path' : '$mediaOrigin/$path';
+  }
 }
 
 /// Reproduit le comportement de `apiClient.js` : injecte le Bearer token sur chaque

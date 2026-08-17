@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../api/api_client.dart';
+
 /// Widgets partagés entre les 4 rôles — équivalents des petits composants réutilisés
 /// partout côté web (StatCard, UserAvatar, états de chargement/erreur/vide).
 class StatCard extends StatelessWidget {
@@ -61,7 +63,7 @@ class StatCard extends StatelessWidget {
   }
 }
 
-class UserAvatar extends StatelessWidget {
+class UserAvatar extends StatefulWidget {
   final String? photoUrl;
   final String initials;
   final double radius;
@@ -69,21 +71,41 @@ class UserAvatar extends StatelessWidget {
   const UserAvatar({super.key, this.photoUrl, required this.initials, this.radius = 18});
 
   @override
+  State<UserAvatar> createState() => _UserAvatarState();
+}
+
+class _UserAvatarState extends State<UserAvatar> {
+  bool _echecChargement = false;
+
+  @override
+  void didUpdateWidget(covariant UserAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrl != widget.photoUrl) _echecChargement = false;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    if (photoUrl != null && photoUrl!.isNotEmpty) {
+    // Résout une éventuelle URL relative (le backend ne construit pas toujours l'URL absolue,
+    // ça dépend du header Host reçu) — et retombe sur les initiales si le chargement échoue
+    // (fichier manquant, réseau...) plutôt que de laisser l'exception se répéter à chaque frame.
+    final resolved = ApiClient.instance.resolveMediaUrl(widget.photoUrl);
+    if (resolved != null && !_echecChargement) {
       return CircleAvatar(
-        radius: radius,
-        backgroundImage: NetworkImage(photoUrl!),
+        radius: widget.radius,
         backgroundColor: scheme.primaryContainer,
+        backgroundImage: NetworkImage(resolved),
+        onBackgroundImageError: (_, _) {
+          if (mounted) setState(() => _echecChargement = true);
+        },
       );
     }
     return CircleAvatar(
-      radius: radius,
+      radius: widget.radius,
       backgroundColor: scheme.primaryContainer,
       child: Text(
-        initials,
-        style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700, fontSize: radius * 0.7),
+        widget.initials,
+        style: TextStyle(color: scheme.onPrimaryContainer, fontWeight: FontWeight.w700, fontSize: widget.radius * 0.7),
       ),
     );
   }
