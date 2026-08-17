@@ -45,6 +45,10 @@ class AppUser {
     this.mustChangePassword = false,
   });
 
+  /// Rôles "personnel" habilités à publier des annonces / composer des messages
+  /// (mêmes STAFF_ROLES que côté web, cf. AnnoncesPanel.jsx / MessageriePanel.jsx).
+  bool get estPersonnel => {UserRole.admin, UserRole.responsable, UserRole.enseignant, UserRole.secretariat}.contains(role);
+
   String get fullName => '$firstName $lastName'.trim();
   String get initials {
     final f = firstName.isNotEmpty ? firstName[0] : '';
