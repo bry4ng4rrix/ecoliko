@@ -257,6 +257,19 @@ class AnneeScolaire(models.Model):
     est_active = models.BooleanField(
         _('est active'), default=False, help_text=_('Une seule année active par établissement.')
     )
+    mois_debut_annee_scolaire = models.PositiveSmallIntegerField(
+        _("mois de début du calendrier scolaire"), default=9,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+        help_text=_(
+            "Premier mois du cycle des 12 mois d'écolage (1=janvier ... 12=décembre, "
+            "9=septembre par défaut). Détermine l'échéancier de l'écolage mensuel."
+        ),
+    )
+    jour_echeance_mensuelle = models.PositiveSmallIntegerField(
+        _("jour d'échéance mensuelle"), default=5,
+        validators=[MinValueValidator(1), MaxValueValidator(28)],
+        help_text=_("Jour du mois auquel l'écolage mensuel est dû (1 à 28, pour rester valide tous les mois)."),
+    )
     date_creation = models.DateTimeField(_('date de création'), auto_now_add=True)
 
     class Meta:

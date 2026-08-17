@@ -849,12 +849,14 @@ function FraisEcolageCalendar({ dossier, anneeActive, paiements, classes, fraisS
     .reduce((somme, p) => somme + Number(p.montant), 0)
   const droitInscriptionPaye = montantInscription != null && totalPayeEcolage >= Number(montantInscription)
 
-  // Même règle d'échéance que côté admin (`PaiementsEtudiantDialog`) : le 5 du mois, l'année
-  // scolaire étant considérée comme un cycle septembre → août.
+  // Même règle d'échéance que côté admin (`PaiementsEtudiantDialog`) : calendrier scolaire
+  // configurable en Paramètres (mois de début du cycle + jour d'échéance), septembre/le 5 par défaut.
   const dateEcheancePourMois = (moisCouvert) => {
     const anneeDebut = new Date(anneeActive.date_debut).getFullYear()
-    const annee = moisCouvert >= 9 ? anneeDebut : anneeDebut + 1
-    return `${annee}-${String(moisCouvert).padStart(2, '0')}-05`
+    const moisDebut = anneeActive.mois_debut_annee_scolaire ?? 9
+    const jourEcheance = anneeActive.jour_echeance_mensuelle ?? 5
+    const annee = moisCouvert >= moisDebut ? anneeDebut : anneeDebut + 1
+    return `${annee}-${String(moisCouvert).padStart(2, '0')}-${String(jourEcheance).padStart(2, '0')}`
   }
 
   const aujourdhui = new Date().toISOString().slice(0, 10)

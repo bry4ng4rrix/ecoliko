@@ -25,7 +25,10 @@ class EcolePubliqueSerializer(serializers.ModelSerializer):
 class AnneeScolaireSerializer(ValidatedModelSerializer):
     class Meta:
         model = AnneeScolaire
-        fields = ('id', 'ecole', 'libelle', 'date_debut', 'date_fin', 'statut', 'est_active', 'date_creation')
+        fields = (
+            'id', 'ecole', 'libelle', 'date_debut', 'date_fin', 'statut', 'est_active',
+            'mois_debut_annee_scolaire', 'jour_echeance_mensuelle', 'date_creation',
+        )
         read_only_fields = ('ecole', 'est_active', 'date_creation')
 
     def create(self, validated_data):

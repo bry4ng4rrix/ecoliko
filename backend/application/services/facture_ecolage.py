@@ -20,9 +20,17 @@ MOIS_LABELS = {
 
 
 def date_echeance_pour_mois(annee_scolaire, mois_couvert: int) -> date:
+    """Échéance d'un mois d'écolage, selon le calendrier scolaire configuré sur l'année
+
+    (`mois_debut_annee_scolaire`/`jour_echeance_mensuelle`, réglables en Paramètres — voir
+    `AnneesScolairesPanel.jsx`). Le cycle des 12 mois s'étend sur deux années civiles dès
+    que `mois_debut_annee_scolaire` > 1 : les mois postérieurs au mois de début tombent sur
+    l'année civile de `date_debut`, les autres sur l'année civile suivante.
+    """
     annee_debut = annee_scolaire.date_debut.year
-    annee = annee_debut if mois_couvert >= 9 else annee_debut + 1
-    return date(annee, mois_couvert, 5)
+    mois_debut = annee_scolaire.mois_debut_annee_scolaire
+    annee = annee_debut if mois_couvert >= mois_debut else annee_debut + 1
+    return date(annee, mois_couvert, annee_scolaire.jour_echeance_mensuelle)
 
 
 def montant_ecolage_mensuel(etudiant, annee_scolaire) -> Decimal | None:

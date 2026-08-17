@@ -40,7 +40,6 @@ import {
   telechargerCarteEtudiant,
   telechargerFactureEcolage,
 } from "@/services";
-import { apiClient } from "@/lib/apiClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -763,14 +762,22 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const droitInscriptionPaye =
     montantInscription != null &&
     totalPayeEcolage >= Number(montantInscription);
+  // Paiement (sans mois_couvert) représentant spécifiquement le droit d'inscription/réinscription
+  // — même logique de calcul que `services.facture_ecolage.est_inscription_payee` côté backend,
+  // qui se base sur le total payé (tous paiements confondus), pas sur un flag séparé.
+  const paiementInscription = mesPaiements.find((p) => p.mois_couvert == null);
 
   const paiementsParMois = (mois) =>
     mesPaiements.filter((p) => p.mois_couvert === mois);
 
+  // Calendrier scolaire configurable en Paramètres (mois de début + jour d'échéance) — même
+  // logique que `services.facture_ecolage.date_echeance_pour_mois` côté backend.
   const dateEcheancePourMois = (mois) => {
     const anneeDebut = new Date(anneeActive.date_debut).getFullYear();
-    const annee = mois >= 9 ? anneeDebut : anneeDebut + 1;
-    return `${annee}-${String(mois).padStart(2, "0")}-05`;
+    const moisDebut = anneeActive.mois_debut_annee_scolaire ?? 9;
+    const jourEcheance = anneeActive.jour_echeance_mensuelle ?? 5;
+    const annee = mois >= moisDebut ? anneeDebut : anneeDebut + 1;
+    return `${annee}-${String(mois).padStart(2, "0")}-${String(jourEcheance).padStart(2, "0")}`;
   };
 
   const aujourdhui = new Date().toISOString().slice(0, 10);
@@ -862,23 +869,35 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     }
   };
 
-  const handleMarquerInscriptionPaye = async () => {
-    if (
-      !window.confirm(
-        "Confirmer : marquer le droit d'inscription/réinscription comme payé ?",
-      )
-    )
-      return;
+  // Bascule le droit d'inscription/réinscription payé ⇄ non payé. Crée ou met à jour un
+  // `PaiementEcolage` sans `mois_couvert` (même mécanisme que `handleMarquerPaye`/
+  // `handleMarquerNonPaye` pour l'écolage mensuel) plutôt que de patcher
+  // `DemandeInscriptionSuivi` (qui ne sert que pour l'instruction initiale d'une demande
+  // d'inscription et n'a aucune incidence sur `droitInscriptionPaye` ni sur
+  // `services.facture_ecolage.est_inscription_payee` côté backend — l'ancien code mettait
+  // donc à jour un champ que rien ne relisait ici).
+  const handleToggleInscriptionPaye = async () => {
     try {
-      await apiClient.patch(`/etudiants/${etudiant.id}/suivi-inscription/`, {
-        frais_inscription_paye: true,
-        notes: "Marqué payé par secrétariat",
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["dossier-financier", etudiant.id, anneeActive?.id],
-      });
-      queryClient.invalidateQueries({ queryKey: ["etudiants"] });
-      toast.success("Droit d'inscription marqué comme payé.");
+      if (paiementInscription) {
+        await updatePaiement.mutateAsync({
+          id: paiementInscription.id,
+          payload: { statut: droitInscriptionPaye ? "EN_ATTENTE" : "PAYE" },
+        });
+      } else {
+        await createPaiement.mutateAsync({
+          etudiant: etudiant.id,
+          annee_scolaire: anneeActive.id,
+          montant: montantInscription ?? 0,
+          date_echeance: anneeActive.date_debut,
+          statut: "PAYE",
+        });
+      }
+      invaliderFinance();
+      toast.success(
+        droitInscriptionPaye
+          ? "Droit d'inscription marqué comme non payé."
+          : "Droit d'inscription marqué comme payé.",
+      );
     } catch (err) {
       const data = err.response?.data;
       toast.error(
@@ -998,15 +1017,19 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                       >
                         Générer facture
                       </button>
-                      {!droitInscriptionPaye && (
-                        <button
-                          type="button"
-                          onClick={handleMarquerInscriptionPaye}
-                          className="text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
-                        >
-                          Marquer payé
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={handleToggleInscriptionPaye}
+                        className={
+                          droitInscriptionPaye
+                            ? "text-xs px-2 py-1 bg-orange-500/20 text-orange-700 rounded hover:bg-orange-500/30 font-medium"
+                            : "text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
+                        }
+                      >
+                        {droitInscriptionPaye
+                          ? "Marquer non payé"
+                          : "Marquer payé"}
+                      </button>
                     </div>
                   </div>
                   <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
