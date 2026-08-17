@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/common.dart';
 import '../../core/widgets/role_shell.dart';
+import '../communication/communication_screen.dart';
 import 'screens/parent_dashboard_screen.dart';
 import 'screens/parent_enfants_screen.dart';
 import 'screens/parent_bulletins_screen.dart';
 import 'screens/parent_absences_screen.dart';
+import 'screens/parent_cahier_texte_screen.dart';
+import 'screens/parent_paiements_screen.dart';
 
 /// Miroir de ParentDashboard.jsx (frontend/src/pages/ParentDashboard.jsx).
 const _items = [
@@ -35,13 +37,13 @@ class ParentShell extends StatelessWidget {
           case 'bulletins':
             return const ParentBulletinsScreen();
           case 'cahier':
-            return const ComingSoonView(feature: 'Cahier de textes');
+            return const ParentCahierTexteScreen();
           case 'absences':
             return const ParentAbsencesScreen();
           case 'paiements':
-            return const ComingSoonView(feature: 'Paiements');
+            return const ParentPaiementsScreen();
           case 'communication':
-            return const ComingSoonView(feature: 'Communication');
+            return const CommunicationScreen();
           default:
             return const SizedBox.shrink();
         }

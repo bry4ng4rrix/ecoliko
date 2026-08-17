@@ -22,6 +22,7 @@ import { ClassesPanel } from '@/components/academique/ClassesPanel'
 import { MatieresPanel } from '@/components/academique/MatieresPanel'
 import { EmploiDuTempsCalendar } from '@/components/academique/EmploiDuTempsCalendar'
 import { PaiementsPanel } from '@/components/finance/PaiementsPanel'
+import { FinanceOverviewChart } from '@/components/finance/FinanceOverviewChart'
 import { DocumentsValidationPanel } from '@/components/documents/DocumentsValidationPanel'
 import { PersonnelPanel } from '@/components/personnel/PersonnelPanel'
 import { AttendancePanel } from '@/components/presences/AttendancePanel'
@@ -135,6 +136,8 @@ function AdminDashboard() {
 
           <TauxParTrimestreChart />
         </div>
+
+        <FinanceOverviewChart />
       </div>
     )
   }

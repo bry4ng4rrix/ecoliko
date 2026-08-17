@@ -20,6 +20,17 @@ final statistiquesProvider = FutureProvider.family<Map<String, dynamic>?, int?>(
 
 final adminTrimestresProvider = FutureProvider<List<Map<String, dynamic>>>((ref) => ResourceService('/trimestres').list());
 
+/// Variante de [statistiquesProvider] avec filtre trimestre optionnel, pour l'écran Rapports.
+final statistiquesFiltreesProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, ({int? anneeScolaireId, int? trimestreId})>((ref, args) async {
+  if (args.anneeScolaireId == null) return null;
+  final response = await ApiClient.instance.dio.get('/statistiques/', queryParameters: {
+    'annee_scolaire': args.anneeScolaireId,
+    if (args.trimestreId != null) 'trimestre': args.trimestreId,
+  });
+  return response.data as Map<String, dynamic>;
+});
+
 /// Miroir du bilan annuel de passage/redoublement : GET /classes/<id>/classement-annuel/.
 final classementAnnuelProvider = FutureProvider.family<List<Map<String, dynamic>>, int>((ref, classeId) async {
   final response = await ApiClient.instance.dio.get('/classes/$classeId/classement-annuel/');

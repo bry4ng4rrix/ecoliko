@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/common.dart';
 import '../../core/widgets/role_shell.dart';
+import '../communication/communication_screen.dart';
 import 'screens/student_dashboard_screen.dart';
 import 'screens/student_edt_screen.dart';
 import 'screens/student_notes_screen.dart';
 import 'screens/student_devoirs_screen.dart';
 import 'screens/student_presence_screen.dart';
 import 'screens/student_profil_screen.dart';
+import 'screens/student_administratif_screen.dart';
+import 'screens/student_documents_screen.dart';
 
 /// Miroir de StudentDashboard.jsx — même liste de sections (frontend/src/pages/StudentDashboard.jsx).
 const _items = [
@@ -45,11 +47,11 @@ class StudentShell extends StatelessWidget {
           case 'presence':
             return const StudentPresenceScreen();
           case 'admin':
-            return const ComingSoonView(feature: 'Gestion Administrative');
+            return const StudentAdministratifScreen();
           case 'communication':
-            return const ComingSoonView(feature: 'Communications');
+            return const CommunicationScreen();
           case 'documents':
-            return const ComingSoonView(feature: 'Mes Documents');
+            return const StudentDocumentsScreen();
           default:
             return const SizedBox.shrink();
         }
