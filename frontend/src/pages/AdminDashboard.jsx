@@ -37,6 +37,8 @@ import { EcoleInfoPanel } from '@/components/parametres/EcoleInfoPanel'
 import { MonProfilPanel } from '@/components/parametres/MonProfilPanel'
 import { DemandesInscriptionPanel } from '@/components/inscriptions/DemandesInscriptionPanel'
 import { NotesEvaluationsPanel } from '@/components/notes/NotesEvaluationsPanel'
+import { TauxParTrimestreChart } from '@/components/statistiques/TauxParTrimestreChart'
+import { DistributionClasseRadarChart } from '@/components/statistiques/DistributionClasseRadarChart'
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -116,28 +118,23 @@ function AdminDashboard() {
           />
         </div>
 
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-xl font-semibold">Distribution par classe</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingClasses ? (
-              <p className="text-sm text-muted-foreground">Chargement...</p>
-            ) : classes?.length ? (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {classes.map((cls) => (
-                  <div key={cls.id} className="bg-muted rounded-xl p-4 text-center border border-border/50 hover:shadow-sm transition-all">
-                    <p className="font-semibold text-primary">{cls.nom}</p>
-                    <p className="text-3xl font-extrabold mt-2 text-indigo-600 dark:text-indigo-400">{cls.effectif}</p>
-                    <p className="text-[10px] text-muted-foreground mt-1 uppercase tracking-wide">élèves</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Aucune classe pour l'année scolaire active.</p>
-            )}
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-xl font-semibold">Distribution par classe</CardTitle>
+              <CardDescription>Effectif de chaque classe de l'année active</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loadingClasses ? (
+                <p className="text-sm text-muted-foreground">Chargement...</p>
+              ) : (
+                <DistributionClasseRadarChart classes={classes} />
+              )}
+            </CardContent>
+          </Card>
+
+          <TauxParTrimestreChart />
+        </div>
       </div>
     )
   }
