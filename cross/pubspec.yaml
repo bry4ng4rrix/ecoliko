@@ -35,6 +35,27 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Réseau + auth
+  dio: ^5.7.0
+  flutter_secure_storage: ^9.2.2
+
+  # État applicatif (équivalent de TanStack Query côté React)
+  flutter_riverpod: ^2.6.1
+
+  # Navigation avec garde de route par rôle (équivalent de ProtectedRoute)
+  go_router: ^14.6.2
+
+  # Dates/heures en français
+  intl: ^0.19.0
+
+  # Sélection/capture de fichiers (pièces jointes, photo de profil, scan OCR)
+  image_picker: ^1.1.2
+  file_picker: ^8.1.6
+  url_launcher: ^6.3.1
+
+  # Nombres/dates formatés, "il y a 5 min", etc.
+  timeago: ^3.7.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
