@@ -1,17 +1,7 @@
-# cross
+# SIG-Lycée — Application mobile/desktop (Flutter)
 
-A new Flutter project.
+Portage cross-platform du frontend web (`../frontend`), consommant la même API Django
+(`../backend`). Couvre les rôles Élève, Enseignant, Parent et Admin.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Voir **[ROADMAP.md](./ROADMAP.md)** pour l'état d'avancement détaillé (ce qui est fait,
+ce qui reste à porter) et les instructions de lancement.

@@ -26,16 +26,23 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final _service = AuthService();
 
   Future<void> _restoreSession() async {
-    final access = await TokenStorage.instance.readAccess();
-    if (access == null) {
-      state = const AuthState(isLoading: false);
-      return;
-    }
+    // Toute défaillance ici (stockage sécurisé indisponible, token expiré, réseau...) doit
+    // retomber sur "non connecté" plutôt que de laisser l'état bloqué en isLoading=true —
+    // sinon le router reste indéfiniment sur l'écran de démarrage (voir test/widget_test.dart).
     try {
+      final access = await TokenStorage.instance.readAccess();
+      if (access == null) {
+        state = const AuthState(isLoading: false);
+        return;
+      }
       final user = await _service.fetchProfile();
       state = AuthState(user: user, isLoading: false);
     } catch (_) {
-      await TokenStorage.instance.clear();
+      try {
+        await TokenStorage.instance.clear();
+      } catch (_) {
+        // Stockage sécurisé indisponible : rien de plus à faire, on reste "non connecté".
+      }
       state = const AuthState(isLoading: false);
     }
   }
