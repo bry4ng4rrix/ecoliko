@@ -51,8 +51,15 @@ def taux_reussite(annee_scolaire, trimestre: Optional[Trimestre] = None) -> dict
     return {'taux_reussite': round(reussis / len(moyennes) * 100, 1), 'nb_evalues': len(moyennes)}
 
 
-def taux_presence(annee_scolaire) -> dict:
+def _seances_de_la_periode(annee_scolaire, trimestre: Optional[Trimestre] = None):
     qs = PresenceCours.objects.filter(etudiant__inscriptions__annee_scolaire=annee_scolaire).distinct()
+    if trimestre is not None:
+        qs = qs.filter(date_cours__gte=trimestre.date_debut, date_cours__lte=trimestre.date_fin)
+    return qs
+
+
+def taux_presence(annee_scolaire, trimestre: Optional[Trimestre] = None) -> dict:
+    qs = _seances_de_la_periode(annee_scolaire, trimestre)
     total = qs.count()
     if not total:
         return {'taux_presence': None, 'total_seances': 0}
@@ -60,10 +67,31 @@ def taux_presence(annee_scolaire) -> dict:
     return {'taux_presence': round(presents / total * 100, 1), 'total_seances': total}
 
 
+def taux_absence(annee_scolaire, trimestre: Optional[Trimestre] = None) -> dict:
+    """Part des séances marquées absent (hors absences justifiées, comptées à part)."""
+    qs = _seances_de_la_periode(annee_scolaire, trimestre)
+    total = qs.count()
+    if not total:
+        return {'taux_absence': None}
+    absents = qs.filter(statut=PresenceCours.StatutPresence.ABSENT).count()
+    return {'taux_absence': round(absents / total * 100, 1)}
+
+
+def taux_retard(annee_scolaire, trimestre: Optional[Trimestre] = None) -> dict:
+    qs = _seances_de_la_periode(annee_scolaire, trimestre)
+    total = qs.count()
+    if not total:
+        return {'taux_retard': None}
+    retards = qs.filter(statut=PresenceCours.StatutPresence.RETARD).count()
+    return {'taux_retard': round(retards / total * 100, 1)}
+
+
 def synthese_statistiques(annee_scolaire, trimestre: Optional[Trimestre] = None) -> dict:
     return {
         'effectifs_par_classe': effectifs_par_classe(annee_scolaire),
         'moyennes_par_classe': moyennes_par_classe(annee_scolaire, trimestre),
         **taux_reussite(annee_scolaire, trimestre),
-        **taux_presence(annee_scolaire),
+        **taux_presence(annee_scolaire, trimestre),
+        **taux_absence(annee_scolaire, trimestre),
+        **taux_retard(annee_scolaire, trimestre),
     }

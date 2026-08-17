@@ -62,6 +62,63 @@ class StatistiquesServiceTests(APITestCase):
         self.assertEqual(resultat['total_seances'], 2)
         self.assertEqual(resultat['taux_presence'], 50.0)
 
+    def _classe_avec_seances(self, statuts, dates=None):
+        classe = f.make_classe()
+        etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau)
+        dates = dates or [f'2026-01-{5 + i:02d}' for i in range(len(statuts))]
+        for statut, date_cours in zip(statuts, dates):
+            PresenceCours.objects.create(
+                etudiant=etudiant, matiere=matiere, date_cours=date_cours,
+                heure_debut='08:00', heure_fin='09:00', statut=statut,
+            )
+        return classe
+
+    def test_taux_absence(self):
+        classe = self._classe_avec_seances([
+            PresenceCours.StatutPresence.PRESENT, PresenceCours.StatutPresence.ABSENT,
+            PresenceCours.StatutPresence.ABSENT, PresenceCours.StatutPresence.PRESENT,
+        ])
+        resultat = stats_service.taux_absence(classe.annee_scolaire)
+        self.assertEqual(resultat['taux_absence'], 50.0)
+
+    def test_taux_retard(self):
+        classe = self._classe_avec_seances([
+            PresenceCours.StatutPresence.PRESENT, PresenceCours.StatutPresence.RETARD,
+        ])
+        resultat = stats_service.taux_retard(classe.annee_scolaire)
+        self.assertEqual(resultat['taux_retard'], 50.0)
+
+    def test_taux_presence_scoped_to_trimestre(self):
+        classe = f.make_classe()
+        annee = classe.annee_scolaire
+        etudiant = f.make_etudiant(ecole=annee.ecole)
+        f.make_inscription(etudiant=etudiant, classe=classe)
+        matiere = f.make_matiere(filiere=classe.filiere, niveau=classe.niveau)
+        t1 = f.make_trimestre(annee_scolaire=annee, numero=1, date_debut='2026-08-01', date_fin='2026-10-31')
+        t2 = f.make_trimestre(annee_scolaire=annee, numero=2, date_debut='2026-11-01', date_fin='2027-01-31')
+
+        # T1 : 1 présent ; T2 : 1 absent — ignorer les séances de T2 en filtrant sur T1.
+        PresenceCours.objects.create(
+            etudiant=etudiant, matiere=matiere, date_cours='2026-09-01',
+            heure_debut='08:00', heure_fin='09:00', statut=PresenceCours.StatutPresence.PRESENT,
+        )
+        PresenceCours.objects.create(
+            etudiant=etudiant, matiere=matiere, date_cours='2026-12-01',
+            heure_debut='08:00', heure_fin='09:00', statut=PresenceCours.StatutPresence.ABSENT,
+        )
+
+        resultat_t1 = stats_service.taux_presence(annee, t1)
+        resultat_t2 = stats_service.taux_presence(annee, t2)
+        self.assertEqual(resultat_t1, {'taux_presence': 100.0, 'total_seances': 1})
+        self.assertEqual(resultat_t2, {'taux_presence': 0.0, 'total_seances': 1})
+
+    def test_taux_absence_no_data_returns_none(self):
+        classe = f.make_classe()
+        self.assertIsNone(stats_service.taux_absence(classe.annee_scolaire)['taux_absence'])
+        self.assertIsNone(stats_service.taux_retard(classe.annee_scolaire)['taux_retard'])
+
 
 class StatistiquesViewTests(APITestCase):
     def test_requires_admin_or_responsable(self):
@@ -84,6 +141,8 @@ class StatistiquesViewTests(APITestCase):
         self.assertIn('moyennes_par_classe', response.data)
         self.assertIn('taux_reussite', response.data)
         self.assertIn('taux_presence', response.data)
+        self.assertIn('taux_absence', response.data)
+        self.assertIn('taux_retard', response.data)
 
     def test_rejects_annee_scolaire_of_another_ecole(self):
         autre_annee = f.make_annee_scolaire()
