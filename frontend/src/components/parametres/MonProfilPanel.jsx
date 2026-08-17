@@ -4,11 +4,13 @@ import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 import { authService } from '@/services/authService'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { UserAvatar } from '@/components/ui/user-avatar'
 
 /** Formulaire de profil personnel (nom, coordonnées, photo) réutilisé par tous les rôles
 
- * de personnel (admin, secrétariat...) — même mécanisme que l'onglet Paramètres enseignant.
+ * (admin, secrétariat, parent...) — même mécanisme que l'onglet Paramètres enseignant.
  */
 export function MonProfilPanel() {
   const { user, setUser } = useAuth()
@@ -50,41 +52,32 @@ export function MonProfilPanel() {
           className="w-20 h-20"
         />
         <div>
-          <label className="block text-sm font-semibold mb-2">Photo de profil</label>
-          <input
-            type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
-            className="text-sm text-muted-foreground file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-muted file:text-foreground file:text-sm"
+          <Label htmlFor="photo" className="block mb-2">Photo de profil</Label>
+          <Input
+            id="photo" type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            className="text-sm text-muted-foreground file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-muted file:text-foreground file:text-sm h-auto"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-semibold mb-2">Prénom</label>
-          <input
-            name="first_name" value={form.first_name} onChange={handleChange} required
-            className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+        <div className="space-y-2">
+          <Label htmlFor="first_name">Prénom</Label>
+          <Input id="first_name" name="first_name" value={form.first_name} onChange={handleChange} required />
         </div>
-        <div>
-          <label className="block text-sm font-semibold mb-2">Nom</label>
-          <input
-            name="last_name" value={form.last_name} onChange={handleChange} required
-            className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+        <div className="space-y-2">
+          <Label htmlFor="last_name">Nom</Label>
+          <Input id="last_name" name="last_name" value={form.last_name} onChange={handleChange} required />
         </div>
-        <div>
-          <label className="block text-sm font-semibold mb-2">Email</label>
-          <input
-            name="email" type="email" value={form.email} onChange={handleChange} required
-            className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input id="email" name="email" type="email" value={form.email} onChange={handleChange} required />
         </div>
-        <div>
-          <label className="block text-sm font-semibold mb-2">Téléphone</label>
-          <input
-            name="telephone" value={form.telephone} onChange={handleChange} placeholder="+261 XX XX XX XX"
-            className="w-full px-4 py-2 rounded-lg bg-muted border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+        <div className="space-y-2">
+          <Label htmlFor="telephone">Téléphone</Label>
+          <Input
+            id="telephone" name="telephone" value={form.telephone} onChange={handleChange}
+            placeholder="+261 XX XX XX XX"
           />
         </div>
       </div>

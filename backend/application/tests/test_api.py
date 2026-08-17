@@ -405,6 +405,11 @@ class CarteEtudiantTests(APITestCase):
         self.assertGreater(len(response.content), 0)
 
     def test_enseignant_cannot_generate_carte_ecolage(self):
+        """`get_queryset` scope déjà un enseignant à ses propres élèves (même mécanisme que
+
+        pour toutes les autres ressources scopées par rôle de ce projet) : un élève hors
+        périmètre est simplement absent du queryset, d'où un 404 — pas un 403, qui
+        supposerait une vérification d'accès après coup sur l'objet."""
         classe = f.make_classe()
         etudiant = f.make_etudiant(ecole=classe.annee_scolaire.ecole)
         f.make_inscription(etudiant=etudiant, classe=classe)
@@ -412,7 +417,7 @@ class CarteEtudiantTests(APITestCase):
         self.client.force_authenticate(user=prof)
 
         response = self.client.get(f'/api/etudiants/{etudiant.id}/carte-ecolage/')
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
 class SallePermissionTests(APITestCase):

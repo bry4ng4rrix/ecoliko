@@ -7,9 +7,9 @@ function initiales(nom) {
 }
 
 /** Avatar générique : affiche la photo si disponible, sinon les initiales du nom. */
-export function UserAvatar({ photo, name, className = '' }) {
+export function UserAvatar({ photo, name, className = '', ...props }) {
   return (
-    <Avatar className={className}>
+    <Avatar className={className} {...props}>
       {photo && <AvatarImage src={photo} alt={name ?? 'Avatar'} />}
       <AvatarFallback className="text-xs font-semibold">{initiales(name)}</AvatarFallback>
     </Avatar>

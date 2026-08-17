@@ -51,7 +51,15 @@ class EtudiantSerializer(ValidatedModelSerializer):
 
 
 class TuteurEtudiantSerializer(ValidatedModelSerializer):
+    parent_nom = serializers.CharField(source='parent.get_full_name', read_only=True)
+    parent_telephone = serializers.CharField(source='parent.telephone', read_only=True, default=None)
+    parent_email = serializers.CharField(source='parent.email', read_only=True)
+    parent_photo = serializers.ImageField(source='parent.photo', read_only=True, default=None)
+
     class Meta:
         model = TuteurEtudiant
-        fields = ('id', 'parent', 'etudiant', 'relation', 'est_contact_principal', 'date_creation')
+        fields = (
+            'id', 'parent', 'parent_nom', 'parent_telephone', 'parent_email', 'parent_photo',
+            'etudiant', 'relation', 'est_contact_principal', 'date_creation',
+        )
         read_only_fields = ('date_creation',)

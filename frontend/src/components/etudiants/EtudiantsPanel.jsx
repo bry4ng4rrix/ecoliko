@@ -14,6 +14,10 @@ import {
   ArrowRightLeft,
   FileCheck,
   Receipt,
+  Users,
+  Phone,
+  Mail,
+  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +43,7 @@ import {
   telechargerCarteEcolage,
   telechargerCarteEtudiant,
   telechargerFactureEcolage,
+  tuteurService,
 } from "@/services";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +93,7 @@ export function EtudiantsPanel() {
   const [dossierEtudiant, setDossierEtudiant] = useState(null);
   const [financeEtudiant, setFinanceEtudiant] = useState(null);
   const [classeEtudiant, setClasseEtudiant] = useState(null);
+  const [infosEtudiant, setInfosEtudiant] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [photo, setPhoto] = useState(null);
   const [filtreClasse, setFiltreClasse] = useState("");
@@ -231,6 +237,13 @@ export function EtudiantsPanel() {
               title="Dossier"
             >
               <FileText className="w-4 h-4 inline" />
+            </button>
+            <button
+              className="text-primary hover:underline"
+              onClick={() => setInfosEtudiant(row.original)}
+              title="Infos élève et parents"
+            >
+              <Users className="w-4 h-4 inline" />
             </button>
             <button
               className="text-primary hover:underline"
@@ -524,6 +537,12 @@ export function EtudiantsPanel() {
           onClose={() => setDossierEtudiant(null)}
         />
       )}
+      {infosEtudiant && (
+        <InfosEtudiantParentsDialog
+          etudiant={infosEtudiant}
+          onClose={() => setInfosEtudiant(null)}
+        />
+      )}
       {financeEtudiant && (
         <PaiementsEtudiantDialog
           etudiant={financeEtudiant}
@@ -762,13 +781,22 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const droitInscriptionPaye =
     montantInscription != null &&
     totalPayeEcolage >= Number(montantInscription);
-  // Paiement (sans mois_couvert) représentant spécifiquement le droit d'inscription/réinscription
-  // — même logique de calcul que `services.facture_ecolage.est_inscription_payee` côté backend,
-  // qui se base sur le total payé (tous paiements confondus), pas sur un flag séparé.
-  const paiementInscription = mesPaiements.find((p) => p.mois_couvert == null);
+  // `mois_couvert` est obligatoire sur PaiementEcolage (1-12) : impossible de créer un
+  // paiement "sans mois" pour représenter le droit d'inscription. On le rattache donc
+  // conventionnellement au mois de début du cycle scolaire, en le marquant via `commentaire`
+  // pour pouvoir le distinguer d'un vrai paiement d'écolage de ce même mois (voir
+  // `paiementsParMois`, qui l'exclut explicitement). Il compte tout de même dans
+  // `totalPayeEcolage`/`_total_paye` (calcul backend), qui somme tous les paiements PAYE sans
+  // distinction — même logique que `services.facture_ecolage.est_inscription_payee`.
+  const MARQUEUR_INSCRIPTION = "Droit d'inscription/réinscription";
+  const paiementInscription = mesPaiements.find(
+    (p) => p.commentaire === MARQUEUR_INSCRIPTION,
+  );
 
   const paiementsParMois = (mois) =>
-    mesPaiements.filter((p) => p.mois_couvert === mois);
+    mesPaiements.filter(
+      (p) => p.mois_couvert === mois && p.commentaire !== MARQUEUR_INSCRIPTION,
+    );
 
   // Calendrier scolaire configurable en Paramètres (mois de début + jour d'échéance) — même
   // logique que `services.facture_ecolage.date_echeance_pour_mois` côté backend.
@@ -889,7 +917,9 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
           annee_scolaire: anneeActive.id,
           montant: montantInscription ?? 0,
           date_echeance: anneeActive.date_debut,
+          mois_couvert: anneeActive.mois_debut_annee_scolaire ?? 9,
           statut: "PAYE",
+          commentaire: MARQUEUR_INSCRIPTION,
         });
       }
       invaliderFinance();
@@ -989,13 +1019,13 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-3">
-                  <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
-                    <span className="text-sm">
-                      {estReinscription
-                        ? "Droit de réinscription"
-                        : "Droit d'inscription"}
-                    </span>
+                  <div className="w-full bg-muted rounded-lg px-3 py-2 flex flex-wrap justify-between items-center gap-2">
                     <div className="flex items-center gap-2">
+                      <span className="text-sm">
+                        {estReinscription
+                          ? "Droit de réinscription"
+                          : "Droit d'inscription"}
+                      </span>
                       <span className="text-sm font-mono">
                         {montantInscription != null
                           ? `${Number(montantInscription).toLocaleString("fr-FR")} Ar`
@@ -1009,7 +1039,7 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                         {droitInscriptionPaye ? "Payé" : "Pas encore payé"}
                       </Badge>
                     </div>
-                    <div className="ml-3 flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={handleGenererFactureInscription}
@@ -1162,6 +1192,121 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
             </div>
           </div>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const RELATION_LABELS = {
+  PERE: "Père",
+  MERE: "Mère",
+  TUTEUR: "Tuteur légal",
+  AUTRE: "Autre",
+};
+
+function InfosEtudiantParentsDialog({ etudiant, onClose }) {
+  const { data: tuteurs, isLoading } = useResourceList(
+    "tuteurs",
+    tuteurService,
+  );
+
+  const sesTuteurs = (tuteurs ?? []).filter(
+    (t) => t.etudiant === etudiant.id,
+  );
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto max-w-xl">
+        <DialogHeader>
+          <DialogTitle>
+            Infos élève et parents — {etudiant.prenom} {etudiant.nom}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          <div className="bg-muted rounded-lg p-4">
+            <h3 className="font-semibold text-sm mb-3">Élève</h3>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground">Matricule</p>
+                <p className="font-mono">{etudiant.matricule}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Classe</p>
+                <p>{etudiant.classe_actuelle ?? "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Téléphone</p>
+                <p>{etudiant.telephone || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Email</p>
+                <p>{etudiant.email || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Adresse</p>
+                <p>{etudiant.adresse || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Contact d'urgence
+                </p>
+                <p>
+                  {etudiant.contact_urgence_nom
+                    ? `${etudiant.contact_urgence_nom} — ${etudiant.contact_urgence_telephone || "—"}`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+              <Users className="w-4 h-4" /> Parents / tuteurs
+            </h3>
+            {isLoading && (
+              <p className="text-sm text-muted-foreground">Chargement...</p>
+            )}
+            {!isLoading && sesTuteurs.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                Aucun parent/tuteur rattaché à cet élève.
+              </p>
+            )}
+            <div className="space-y-3">
+              {sesTuteurs.map((t) => (
+                <div
+                  key={t.id}
+                  className="border border-border rounded-lg p-3"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium flex items-center gap-2">
+                        {t.parent_nom}
+                        {t.est_contact_principal && (
+                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {RELATION_LABELS[t.relation] ?? t.relation}
+                        {t.est_contact_principal && " · Contact principal"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+                      {t.parent_telephone || "—"}
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-muted-foreground" />
+                      {t.parent_email || "—"}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
