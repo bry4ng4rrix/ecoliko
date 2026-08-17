@@ -40,8 +40,12 @@ class EtudiantViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         return qs  # ADMIN / RESPONSABLE / SECRETARIAT : tout l'établissement
 
     def get_permissions(self):
-        if self.action in ('create', 'update', 'partial_update', 'destroy', 'certificat_scolarite', 'carte_ecolage'):
+        # Administrative writes and certificate generation remain admin/secretariat-only
+        if self.action in ('create', 'update', 'partial_update', 'destroy', 'certificat_scolarite'):
             return [permissions.IsAuthenticated(), IsAdminOrSecretariat()]
+        # Allow authenticated users (including parents scoped via get_queryset) to download carte_ecolage
+        if self.action == 'carte_ecolage':
+            return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
 
     @action(detail=True, methods=['post'], url_path='certificat-scolarite')

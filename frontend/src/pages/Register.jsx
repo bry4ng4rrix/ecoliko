@@ -142,6 +142,7 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
     role: "ETUDIANT",
     genre: "H",
     ecole: "",
+    matricule_enfant: "",
   });
   const [ecoles, setEcoles] = useState([]);
   const navigate = useNavigate();
@@ -174,6 +175,10 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
       setError("Veuillez remplir tous les champs obligatoires");
       return;
     }
+    if (formData.role === "PARENT" && !formData.matricule_enfant) {
+      setError("Veuillez fournir le matricule de votre enfant.");
+      return;
+    }
     if (formData.password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères");
       return;
@@ -189,6 +194,7 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
         role: formData.role,
         genre: formData.genre,
         ecole: Number(formData.ecole),
+        matricule_enfant: formData.matricule_enfant?.trim() || undefined,
       });
 
       setSuccess(
@@ -341,6 +347,25 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
           par l'établissement.
         </p>
       </div>
+
+      {formData.role === "PARENT" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="matricule_enfant" className="text-slate-300">
+            Matricule de l'enfant *
+          </Label>
+          <div className="relative">
+            <Input
+              id="matricule_enfant"
+              name="matricule_enfant"
+              value={formData.matricule_enfant}
+              onChange={handleChange}
+              placeholder="Ex: 2023-INF-0001"
+              required
+              className="pl-3 bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         <Label htmlFor="genre" className="text-slate-300">

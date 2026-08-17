@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from ..models import Ecole, User
+from ..models import Ecole, User, Etudiant, TuteurEtudiant
 from .demandes_inscription import DemandeInscriptionSuiviSerializer, PieceJointeInscriptionSerializer
 
 MOT_DE_PASSE_TEMPORAIRE = '12345678'
@@ -66,10 +66,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     de comptes utilisables directement depuis un point d'entrée public non vérifié.
     """
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
+    matricule_enfant = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = User
-        fields = ('id', 'email', 'password', 'first_name', 'last_name', 'role', 'genre', 'ecole')
+        fields = ('id', 'email', 'password', 'first_name', 'last_name', 'role', 'genre', 'ecole', 'matricule_enfant')
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
@@ -85,9 +86,41 @@ class RegisterSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def validate(self, attrs):
+        # If registering as parent, require matricule_enfant
+        role = attrs.get('role')
+        if role == User.Role.PARENT:
+            matricule = attrs.get('matricule_enfant')
+            if not matricule:
+                raise serializers.ValidationError({'matricule_enfant': "Le matricule de l'enfant est requis pour un parent."})
+            # check student existence
+            etu = Etudiant.objects.filter(matricule__iexact=matricule).first()
+            if not etu:
+                raise serializers.ValidationError({'matricule_enfant': "Aucun étudiant trouvé avec ce matricule."})
+            # attach found student object to attrs for use in create()
+            attrs['_matricule_enfant_obj'] = etu
+        return attrs
+
+    @transaction.atomic
     def create(self, validated_data):
+        # Pop out helper
+        etu = validated_data.pop('_matricule_enfant_obj', None)
+        # Remove raw matricule field so it isn't passed to User.create_user
+        validated_data.pop('matricule_enfant', None)
+        # Ensure account inactive by default
         validated_data['is_active'] = False
-        return User.objects.create_user(**validated_data)
+
+        # If parent, set parent's school to the student's school (ensures same ecole)
+        if validated_data.get('role') == User.Role.PARENT and etu is not None:
+            validated_data['ecole'] = etu.ecole
+
+        user = User.objects.create_user(**validated_data)
+
+        # Create tuteur link when registering as parent
+        if validated_data.get('role') == User.Role.PARENT and etu is not None:
+            TuteurEtudiant.objects.create(parent=user, etudiant=etu, relation=TuteurEtudiant.Relation.AUTRE)
+
+        return user
 
 
 class EcoleAdminRegisterSerializer(serializers.Serializer):
