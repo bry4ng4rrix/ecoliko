@@ -11,6 +11,7 @@ from ..services import scoping
 from ..services.carte_ecolage import generer_carte_ecolage_pdf
 from ..services.carte_etudiant import generer_carte_etudiant_pdf
 from ..services.documents import generer_pdf_document
+from ..services.facture_ecolage import generer_facture_ecolage_pdf
 from ..services.identite import codebarre_etudiant_png, qrcode_etudiant_png
 
 
@@ -44,9 +45,29 @@ class EtudiantViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         if self.action in ('create', 'update', 'partial_update', 'destroy', 'certificat_scolarite'):
             return [permissions.IsAuthenticated(), IsAdminOrSecretariat()]
         # Allow authenticated users (including parents scoped via get_queryset) to download carte_ecolage
-        if self.action == 'carte_ecolage':
+        if self.action in ('carte_ecolage', 'facture_ecolage'):
             return [permissions.IsAuthenticated()]
         return [permissions.IsAuthenticated()]
+
+    @action(detail=True, methods=['patch'], url_path='suivi-inscription', permission_classes=[IsAdminOrSecretariat])
+    def suivi_inscription(self, request, pk=None):
+        """Met à jour le suivi de paiement des droits d'inscription/réinscription pour l'étudiant.
+
+        Corps possible: `{ "frais_inscription_paye": true, "notes": "..." }`.
+        """
+        etudiant = self.get_object()
+        utilisateur = etudiant.utilisateur
+        if utilisateur is None:
+            return Response({'detail': "Étudiant sans compte utilisateur associé."}, status=400)
+
+        from ..models import DemandeInscriptionSuivi
+        from ..serializers import DemandeInscriptionSuiviSerializer
+
+        suivi, _ = DemandeInscriptionSuivi.objects.get_or_create(utilisateur=utilisateur)
+        serializer = DemandeInscriptionSuiviSerializer(suivi, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response({'suivi': serializer.data})
 
     @action(detail=True, methods=['post'], url_path='certificat-scolarite')
     def certificat_scolarite(self, request, pk=None):
@@ -78,6 +99,39 @@ class EtudiantViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
         pdf_bytes = generer_carte_ecolage_pdf(etudiant, annee)
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="carte_ecolage_{etudiant.matricule}.pdf"'
+        return response
+
+    @action(detail=True, methods=['get'], url_path='facture-ecolage')
+    def facture_ecolage(self, request, pk=None):
+        """Facture PDF pour un mois d'écolage impayé ou le droit d'inscription (?mois= ou ?type=inscription)."""
+        etudiant = self.get_object()
+        annee_id = request.query_params.get('annee_scolaire')
+        if not annee_id:
+            return Response({'detail': "Paramètre 'annee_scolaire' requis."}, status=400)
+
+        annee = AnneeScolaire.objects.filter(pk=annee_id, ecole_id=etudiant.ecole_id).first()
+        if annee is None:
+            return Response({'detail': 'Année scolaire introuvable.'}, status=404)
+
+        type_facture = request.query_params.get('type')
+        mois_param = request.query_params.get('mois')
+        allow_paye = request.query_params.get('allow_paye') in ('1', 'true', 'yes', 'True')
+
+        try:
+            if type_facture == 'inscription':
+                pdf_bytes = generer_facture_ecolage_pdf(etudiant, annee, inscription=True, allow_paye=allow_paye)
+                suffix = 'inscription'
+            else:
+                if not mois_param:
+                    return Response({'detail': "Paramètre 'mois' requis (1-12) ou type=inscription."}, status=400)
+                mois = int(mois_param)
+                pdf_bytes = generer_facture_ecolage_pdf(etudiant, annee, mois_couvert=mois, allow_paye=allow_paye)
+                suffix = f"mois_{mois:02d}"
+        except ValueError as exc:
+            return Response({'detail': str(exc)}, status=400)
+
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="facture_ecolage_{etudiant.matricule}_{suffix}.pdf"'
         return response
 
     @action(detail=True, methods=['get'])

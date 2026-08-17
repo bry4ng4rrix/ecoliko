@@ -2,12 +2,13 @@ from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from ..models import AnneeScolaire, FraisScolarite, PaiementEcolage, User
+from ..models import AnneeScolaire, FraisScolarite, PaiementEcolage, User, Etudiant
 from ..permissions import EcoleScopedQuerysetMixin, IsAdminOrSecretariat, ReadOnlyOrAdmin
 from ..serializers import (
     DossierFinancierSerializer, FraisScolariteSerializer, PaiementEcolageSerializer, SyntheseFinanciereSerializer,
 )
 from ..services.finance import dossier_financier, synthese_ecole
+from ..services.facture_ecolage import est_mois_paye, montant_ecolage_mensuel, date_echeance_pour_mois
 
 
 class FraisScolariteViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -88,3 +89,48 @@ class PaiementEcolageViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
             return Response({'detail': 'Année scolaire introuvable.'}, status=404)
 
         return Response(SyntheseFinanciereSerializer(synthese_ecole(annee.ecole, annee)).data)
+
+    @action(detail=False, methods=['get'], url_path='calendrier-impayes', permission_classes=[IsAdminOrSecretariat])
+    def calendrier_impayes(self, request):
+        """Renvoie la liste des mois d'écolage impayés par étudiant pour une année scolaire.
+
+        Paramètres requis: `annee_scolaire` (id).
+        Retourne une liste d'objets: etudiant_id, nom, matricule, mois, date_echeance, montant, annee_scolaire.
+        """
+        annee_id = request.query_params.get('annee_scolaire')
+        if not annee_id:
+            return Response({'detail': "Paramètre 'annee_scolaire' requis."}, status=400)
+
+        annee = AnneeScolaire.objects.filter(pk=annee_id).first()
+        if annee is None:
+            return Response({'detail': 'Année scolaire introuvable.'}, status=404)
+
+        # Étudiants inscrits pour cette année (scopé à l'école de l'utilisateur)
+        if request.user.is_superuser:
+            etudiants = Etudiant.objects.filter(inscriptions__annee_scolaire=annee).distinct()
+        else:
+            etudiants = Etudiant.objects.filter(ecole_id=request.user.ecole_id, inscriptions__annee_scolaire=annee).distinct()
+
+        events = []
+        for etu in etudiants:
+            for mois in range(1, 13):
+                try:
+                    if not est_mois_paye(etu, annee, mois):
+                        montant = montant_ecolage_mensuel(etu, annee)
+                        if montant is None:
+                            continue
+                        date_ech = date_echeance_pour_mois(annee, mois)
+                        events.append({
+                            'etudiant_id': etu.id,
+                            'etudiant_nom': f"{etu.nom} {etu.prenom}",
+                            'matricule': etu.matricule,
+                            'mois': mois,
+                            'date_echeance': date_ech.isoformat(),
+                            'montant': str(montant),
+                            'annee_scolaire': annee.id,
+                        })
+                except Exception:
+                    # Ignore erreurs individuelles et continuer
+                    continue
+
+        return Response(events)
