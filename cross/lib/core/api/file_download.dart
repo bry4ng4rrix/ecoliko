@@ -14,8 +14,22 @@ Future<void> downloadAndOpen(String path, String fileName) async {
     path,
     options: Options(responseType: ResponseType.bytes),
   );
+  await _enregistrerEtOuvrir(response.data!, fileName);
+}
+
+/// Variante POST de [downloadAndOpen] — certains endpoits de génération PDF déclenchent
+/// un effet de bord (ex. validation d'office d'un certificat) et n'utilisent donc pas GET.
+Future<void> downloadAndOpenPost(String path, String fileName) async {
+  final response = await ApiClient.instance.dio.post<List<int>>(
+    path,
+    options: Options(responseType: ResponseType.bytes),
+  );
+  await _enregistrerEtOuvrir(response.data!, fileName);
+}
+
+Future<void> _enregistrerEtOuvrir(List<int> bytes, String fileName) async {
   final dir = await getTemporaryDirectory();
   final file = File('${dir.path}/$fileName');
-  await file.writeAsBytes(response.data!);
+  await file.writeAsBytes(bytes);
   await OpenFilex.open(file.path);
 }

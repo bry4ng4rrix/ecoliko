@@ -6,48 +6,34 @@ import '../admin_providers.dart';
 
 const _relationLabels = {'PERE': 'Père', 'MERE': 'Mère', 'TUTEUR': 'Tuteur légal', 'AUTRE': 'Autre'};
 
-const _statutDossierLabels = {'PAYE': 'Payé', 'PARTIEL': 'Partiel', 'IMPAYE': 'Impayé', 'NON_CONFIGURE': 'Non configuré'};
-
-const _statutDossierColors = {
-  'PAYE': Colors.green,
-  'PARTIEL': Colors.orange,
-  'IMPAYE': Colors.red,
-  'NON_CONFIGURE': Colors.grey,
-};
-
-/// Affiche les informations d'un élève + son dossier financier + ses parents/tuteurs.
-/// Miroir de `InfosEtudiantParentsDialog` (frontend/src/components/etudiants/EtudiantsPanel.jsx).
+/// Affiche les informations personnelles d'un élève et la liste de ses parents/tuteurs.
+/// Miroir exact de `InfosEtudiantParentsDialog` (frontend/src/components/etudiants/EtudiantsPanel.jsx)
+/// — le dossier financier a sa propre action dédiée ("Paiements", voir `paiements_etudiant_sheet.dart`).
 Future<void> ouvrirDetailEtudiant(BuildContext context, Map<String, dynamic> etudiant, {int? anneeScolaireId}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     builder: (context) => DraggableScrollableSheet(
-      initialChildSize: 0.85,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
+      initialChildSize: 0.75,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
       expand: false,
-      builder: (context, scrollController) => _EtudiantDetailContent(
-        etudiant: etudiant,
-        anneeScolaireId: anneeScolaireId,
-        scrollController: scrollController,
-      ),
+      builder: (context, scrollController) => _EtudiantDetailContent(etudiant: etudiant, scrollController: scrollController),
     ),
   );
 }
 
 class _EtudiantDetailContent extends ConsumerWidget {
   final Map<String, dynamic> etudiant;
-  final int? anneeScolaireId;
   final ScrollController scrollController;
 
-  const _EtudiantDetailContent({required this.etudiant, required this.anneeScolaireId, required this.scrollController});
+  const _EtudiantDetailContent({required this.etudiant, required this.scrollController});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final etudiantId = etudiant['id'] as int;
     final tuteursAsync = ref.watch(tuteursDeLetudiantProvider(etudiantId));
-    final dossierAsync = ref.watch(dossierFinancierProvider((etudiantId: etudiantId, anneeScolaireId: anneeScolaireId)));
 
     return SafeArea(
       child: ListView(
@@ -63,7 +49,7 @@ class _EtudiantDetailContent extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('${etudiant['prenom']} ${etudiant['nom']}', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-                    Text('${etudiant['matricule'] ?? '—'} · ${etudiant['classe_actuelle'] ?? 'Non affecté'}', style: TextStyle(color: scheme.onSurfaceVariant)),
+                    Text('Infos élève et parents', style: TextStyle(color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -76,63 +62,45 @@ class _EtudiantDetailContent extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Informations', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  Text('Élève', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
-                  _ligne(context, Icons.phone_rounded, etudiant['telephone']?.toString()),
-                  _ligne(context, Icons.email_rounded, etudiant['email']?.toString()),
-                  _ligne(context, Icons.home_rounded, etudiant['adresse']?.toString()),
-                  _ligne(context, Icons.emergency_rounded, etudiant['contact_urgence']?.toString()),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Dossier financier', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 12),
-                  dossierAsync.when(
-                    loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: LinearProgressIndicator()),
-                    error: (e, _) => const Text('Dossier indisponible.'),
-                    data: (dossier) {
-                      if (dossier == null) return const Text('Aucune année scolaire active.');
-                      final statut = dossier['statut']?.toString() ?? 'NON_CONFIGURE';
-                      final couleur = _statutDossierColors[statut] ?? Colors.grey;
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _statLigne(context, 'Total dû', dossier['total_du']),
-                          _statLigne(context, 'Total payé', dossier['total_paye'], couleur: Colors.green),
-                          _statLigne(context, 'Reste dû', dossier['reste_du'], gras: true),
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(color: couleur.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                            child: Text(
-                              _statutDossierLabels[statut] ?? statut,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: couleur.shade700),
-                            ),
-                          ),
-                        ],
-                      );
-                    },
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _champ(context, 'Matricule', etudiant['matricule']?.toString())),
+                      Expanded(child: _champ(context, 'Classe', etudiant['classe_actuelle']?.toString())),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: _champ(context, 'Téléphone', etudiant['telephone']?.toString())),
+                      Expanded(child: _champ(context, 'Email', etudiant['email']?.toString())),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _champ(context, 'Adresse', etudiant['adresse']?.toString()),
+                  const SizedBox(height: 10),
+                  _champ(
+                    context,
+                    "Contact d'urgence",
+                    (etudiant['contact_urgence_nom'] as String?)?.isNotEmpty == true
+                        ? '${etudiant['contact_urgence_nom']} — ${(etudiant['contact_urgence_telephone'] as String?)?.isNotEmpty == true ? etudiant['contact_urgence_telephone'] : '—'}'
+                        : null,
                   ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text('Parents / tuteurs', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           tuteursAsync.when(
             loading: () => const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: LinearProgressIndicator()),
             error: (e, _) => const Text('Parents indisponibles.'),
             data: (tuteurs) {
-              if (tuteurs.isEmpty) return const Text('Aucun parent/tuteur lié.');
+              if (tuteurs.isEmpty) return const Text('Aucun parent/tuteur rattaché à cet élève.', style: TextStyle(fontSize: 13));
               return Column(
                 children: tuteurs.map((t) {
                   final estPrincipal = t['est_contact_principal'] == true;
@@ -169,33 +137,14 @@ class _EtudiantDetailContent extends ConsumerWidget {
     );
   }
 
-  Widget _ligne(BuildContext context, IconData icon, String? valeur) {
-    if (valeur == null || valeur.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-          const SizedBox(width: 8),
-          Expanded(child: Text(valeur)),
-        ],
-      ),
-    );
-  }
-
-  Widget _statLigne(BuildContext context, String label, dynamic valeur, {Color? couleur, bool gras = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          Text(
-            '${valeur ?? 0} Ar',
-            style: TextStyle(fontWeight: gras ? FontWeight.w800 : FontWeight.w600, color: couleur),
-          ),
-        ],
-      ),
+  Widget _champ(BuildContext context, String label, String? valeur) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 2),
+        Text(valeur?.isNotEmpty == true ? valeur! : '—'),
+      ],
     );
   }
 

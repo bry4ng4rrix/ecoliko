@@ -83,3 +83,19 @@ final paiementsDeLetudiantProvider =
     'annee_scolaire': args.anneeScolaireId,
   });
 });
+
+/// Toutes les inscriptions d'un étudiant, toutes années confondues — nécessaire pour
+/// détecter une réinscription (miroir de `estReinscription`, `PaiementsEtudiantDialog`).
+final toutesInscriptionsDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
+  (ref, etudiantId) => ResourceService('/inscriptions').list({'etudiant': etudiantId}),
+);
+
+/// Tarifs de scolarité par niveau/filière — miroir de `fraisScolarite`
+/// (`PaiementsEtudiantDialog`, EtudiantsPanel.jsx).
+final fraisScolariteProvider = FutureProvider<List<Map<String, dynamic>>>((ref) => ResourceService('/frais-scolarite').list());
+
+/// Documents justificatifs versés au dossier d'un étudiant — miroir de `mesDocuments`
+/// (`DossierEtudiantDialog`, EtudiantsPanel.jsx).
+final documentsDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
+  (ref, etudiantId) => ResourceService('/documents-etudiants').list({'etudiant': etudiantId}),
+);

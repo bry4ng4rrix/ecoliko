@@ -5,6 +5,7 @@ import '../../../core/api/resource_service.dart';
 import '../../../core/widgets/common.dart';
 import '../admin_providers.dart';
 import '../widgets/changer_classe_dialog.dart';
+import '../widgets/dossier_etudiant_sheet.dart';
 import '../widgets/etudiant_detail_sheet.dart';
 import '../widgets/etudiant_form_dialog.dart';
 import '../widgets/paiements_etudiant_sheet.dart';
@@ -105,13 +106,16 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                             leading: UserAvatar(photoUrl: e['photo'] as String?, initials: _initials(e)),
                             title: Text('${e['prenom']} ${e['nom']}', style: const TextStyle(fontWeight: FontWeight.w700)),
                             subtitle: Text('${e['matricule'] ?? '—'} · ${e['classe_actuelle'] ?? 'Non affecté'}'),
-                            onTap: () => ouvrirDetailEtudiant(context, e, anneeScolaireId: anneeActiveId),
+                            onTap: () => ouvrirDetailEtudiant(context, e),
                             trailing: PopupMenuButton<String>(
                               tooltip: 'Actions',
                               onSelected: (action) {
                                 switch (action) {
                                   case 'dossier':
-                                    ouvrirDetailEtudiant(context, e, anneeScolaireId: anneeActiveId);
+                                    ouvrirDossierEtudiant(context, e);
+                                    break;
+                                  case 'infos':
+                                    ouvrirDetailEtudiant(context, e);
                                     break;
                                   case 'paiements':
                                     ouvrirPaiementsEtudiant(context, e, anneeScolaireId: anneeActiveId);
@@ -128,7 +132,8 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                                 }
                               },
                               itemBuilder: (context) => const [
-                                PopupMenuItem(value: 'dossier', child: ListTile(leading: Icon(Icons.description_outlined), title: Text('Dossier & parents'), contentPadding: EdgeInsets.zero)),
+                                PopupMenuItem(value: 'dossier', child: ListTile(leading: Icon(Icons.description_outlined), title: Text('Dossier'), contentPadding: EdgeInsets.zero)),
+                                PopupMenuItem(value: 'infos', child: ListTile(leading: Icon(Icons.people_outline_rounded), title: Text('Infos élève et parents'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'paiements', child: ListTile(leading: Icon(Icons.account_balance_wallet_outlined), title: Text('Paiements'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'classe', child: ListTile(leading: Icon(Icons.swap_horiz_rounded), title: Text('Changer de classe'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'modifier', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Modifier'), contentPadding: EdgeInsets.zero)),
