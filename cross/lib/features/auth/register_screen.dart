@@ -282,12 +282,13 @@ class _JoinFormState extends State<_JoinForm> {
   Future<void> _chargerEcoles() async {
     try {
       final response = await ApiClient.instance.dio.get('/ecoles/publiques/');
+      if (!mounted) return;
       setState(() {
         _ecoles = (response.data as List).cast<Map<String, dynamic>>();
         _ecolesEnCours = false;
       });
     } catch (_) {
-      setState(() => _ecolesEnCours = false);
+      if (mounted) setState(() => _ecolesEnCours = false);
     }
   }
 
