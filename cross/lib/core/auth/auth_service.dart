@@ -26,6 +26,18 @@ class AuthService {
     return AppUser.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Auto-inscription élève/parent (compte en attente de validation par l'établissement) —
+  /// miroir de `authService.register` / `JoinForm` (frontend/src/pages/Register.jsx).
+  Future<void> register(Map<String, dynamic> payload) async {
+    await _dio.post('/auth/register/', data: payload);
+  }
+
+  /// Création d'un nouvel établissement + de son compte administrateur — miroir de
+  /// `authService.registerEcole` / `CreateEcoleForm` (frontend/src/pages/Register.jsx).
+  Future<void> registerEcole(Map<String, dynamic> payload) async {
+    await _dio.post('/auth/register/ecole/', data: payload);
+  }
+
   /// Miroir de `MonProfilPanel.jsx` : mise à jour partielle (nom/prénom/téléphone + photo
   /// optionnelle). `XFile` (image_picker) fonctionne aussi bien mobile/desktop que web —
   /// contrairement à `dart:io File`, il expose `readAsBytes()` sur toutes les plateformes.

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../auth/auth_provider.dart';
 import '../../models/user.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/register_screen.dart';
 import '../../features/student/student_shell.dart';
 import '../../features/teacher/teacher_shell.dart';
 import '../../features/parent/parent_shell.dart';
@@ -49,7 +50,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (auth.isLoading) return null;
 
       if (!auth.isAuthenticated) {
-        return loc == '/login' ? null : '/login';
+        return (loc == '/login' || loc == '/register') ? null : '/login';
       }
 
       final home = roleHome(auth.user!.role);
@@ -67,6 +68,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/', builder: (context, state) => const _SplashScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
       GoRoute(path: '/unsupported', builder: (context, state) => const _UnsupportedRoleScreen()),
       GoRoute(path: '/student', builder: (context, state) => const StudentShell()),
       GoRoute(path: '/teacher', builder: (context, state) => const TeacherShell()),

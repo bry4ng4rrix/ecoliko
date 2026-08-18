@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_provider.dart';
 
@@ -156,7 +157,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+                    TextButton(
+                      onPressed: () => context.go('/register'),
+                      child: RichText(
+                        text: const TextSpan(
+                          style: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
+                          children: [
+                            TextSpan(text: "Pas encore de compte ? "),
+                            TextSpan(text: 'Créer un compte', style: TextStyle(color: Color(0xFF818CF8), fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Text('© ${DateTime.now().year} SIG-Lycée • Tous droits réservés', style: const TextStyle(color: Colors.white38, fontSize: 11)),
                   ],
                 ),
