@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -47,6 +48,10 @@ class _ChangerClasseDialogState extends ConsumerState<_ChangerClasseDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Classe mise à jour.')));
       }
+    } on DioException catch (err) {
+      final data = err.response?.data;
+      final message = data is Map ? data.values.expand((v) => v is List ? v : [v]).join(' ') : 'Erreur lors du changement de classe.';
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (_) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur lors du changement de classe.')));
     } finally {

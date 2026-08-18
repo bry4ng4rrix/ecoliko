@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/error_message.dart';
 import '../../../core/api/file_download.dart';
 import '../admin_providers.dart';
 
@@ -72,12 +73,12 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
     ref.invalidate(dossierFinancierProvider);
   }
 
-  Future<void> _executer(String cle, Future<void> Function() action) async {
+  Future<void> _executer(String cle, Future<void> Function() action, {String repli = 'Erreur lors de la mise à jour.'}) async {
     setState(() => _actionEnCours = cle);
     try {
       await action();
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Erreur lors de la mise à jour.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(messageErreur(e, repli))));
     } finally {
       if (mounted) setState(() => _actionEnCours = null);
     }
@@ -145,25 +146,33 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
   }
 
   Future<void> _telechargerCarteEcolage() {
-    return _executer('carte', () async {
-      final matricule = widget.etudiant['matricule'];
-      await downloadAndOpen('/etudiants/$_etudiantId/carte-ecolage/', 'carte_ecolage_$matricule.pdf');
-    });
+    return _executer(
+      'carte',
+      () async {
+        final matricule = widget.etudiant['matricule'];
+        await downloadAndOpen('/etudiants/$_etudiantId/carte-ecolage/', 'carte_ecolage_$matricule.pdf');
+      },
+      repli: 'Erreur lors de la génération de la carte.',
+    );
   }
 
   Future<void> _telechargerFacture({required int anneeId, int? mois, bool inscription = false, bool allowPaye = false}) {
-    return _executer(inscription ? 'facture-inscription' : 'facture-$mois', () async {
-      final matricule = widget.etudiant['matricule'];
-      final params = <String>['annee_scolaire=$anneeId'];
-      if (inscription) {
-        params.add('type=inscription');
-      } else {
-        params.add('mois=$mois');
-      }
-      if (allowPaye) params.add('allow_paye=1');
-      final suffix = inscription ? 'inscription' : 'mois_$mois';
-      await downloadAndOpen('/etudiants/$_etudiantId/facture-ecolage/?${params.join('&')}', 'facture_${matricule}_$suffix.pdf');
-    });
+    return _executer(
+      inscription ? 'facture-inscription' : 'facture-$mois',
+      () async {
+        final matricule = widget.etudiant['matricule'];
+        final params = <String>['annee_scolaire=$anneeId'];
+        if (inscription) {
+          params.add('type=inscription');
+        } else {
+          params.add('mois=$mois');
+        }
+        if (allowPaye) params.add('allow_paye=1');
+        final suffix = inscription ? 'inscription' : 'mois_$mois';
+        await downloadAndOpen('/etudiants/$_etudiantId/facture-ecolage/?${params.join('&')}', 'facture_${matricule}_$suffix.pdf');
+      },
+      repli: 'Erreur lors de la génération de la facture.',
+    );
   }
 
   @override

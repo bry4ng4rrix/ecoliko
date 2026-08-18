@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/api/error_message.dart';
 import '../../../core/api/file_download.dart';
 import '../../../core/api/resource_service.dart';
 import '../admin_providers.dart';
@@ -55,12 +56,12 @@ class _DossierContentState extends ConsumerState<_DossierContent> {
 
   int get _etudiantId => widget.etudiant['id'] as int;
 
-  Future<void> _executer(String cle, Future<void> Function() action) async {
+  Future<void> _executer(String cle, Future<void> Function() action, {String repli = 'Une erreur est survenue.'}) async {
     setState(() => _actionEnCours = cle);
     try {
       await action();
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Une erreur est survenue.')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(messageErreur(e, repli))));
     } finally {
       if (mounted) setState(() => _actionEnCours = null);
     }
@@ -76,32 +77,44 @@ class _DossierContentState extends ConsumerState<_DossierContent> {
         setState(() => _barcodeBytes = Uint8List.fromList(response.data!));
       });
 
-  Future<void> _genererCarte() => _executer('carte', () async {
-        await downloadAndOpen('/etudiants/$_etudiantId/carte/', 'carte_${widget.etudiant['matricule']}.pdf');
-      });
+  Future<void> _genererCarte() => _executer(
+        'carte',
+        () async {
+          await downloadAndOpen('/etudiants/$_etudiantId/carte/', 'carte_${widget.etudiant['matricule']}.pdf');
+        },
+        repli: 'Erreur lors de la génération de la carte.',
+      );
 
-  Future<void> _genererCertificat() => _executer('certificat', () async {
-        await downloadAndOpenPost('/etudiants/$_etudiantId/certificat-scolarite/', 'certificat_scolarite_${widget.etudiant['matricule']}.pdf');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Certificat de scolarité généré.')));
-      });
+  Future<void> _genererCertificat() => _executer(
+        'certificat',
+        () async {
+          await downloadAndOpenPost('/etudiants/$_etudiantId/certificat-scolarite/', 'certificat_scolarite_${widget.etudiant['matricule']}.pdf');
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Certificat de scolarité généré.')));
+        },
+        repli: 'Erreur lors de la génération du certificat.',
+      );
 
   Future<void> _choisirFichier() async {
     final resultat = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png']);
     if (resultat.isNotEmpty) setState(() => _fichier = resultat.first);
   }
 
-  Future<void> _ajouterDocument() => _executer('upload', () async {
-        if (_fichier == null) return;
-        final form = FormData.fromMap({
-          'etudiant': _etudiantId,
-          'type_document': _typeDoc,
-          'fichier': MultipartFile.fromBytes(await _fichier!.readAsBytes(), filename: _fichier!.name),
-        });
-        await ApiClient.instance.dio.post('/documents-etudiants/', data: form);
-        ref.invalidate(documentsDeLetudiantProvider);
-        setState(() => _fichier = null);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document ajouté.')));
-      });
+  Future<void> _ajouterDocument() => _executer(
+        'upload',
+        () async {
+          if (_fichier == null) return;
+          final form = FormData.fromMap({
+            'etudiant': _etudiantId,
+            'type_document': _typeDoc,
+            'fichier': MultipartFile.fromBytes(await _fichier!.readAsBytes(), filename: _fichier!.name),
+          });
+          await ApiClient.instance.dio.post('/documents-etudiants/', data: form);
+          ref.invalidate(documentsDeLetudiantProvider);
+          setState(() => _fichier = null);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document ajouté.')));
+        },
+        repli: "Erreur lors de l'ajout du document.",
+      );
 
   Future<void> _supprimerDocument(int id) => _executer('doc-$id', () async {
         await ResourceService('/documents-etudiants').remove(id);
