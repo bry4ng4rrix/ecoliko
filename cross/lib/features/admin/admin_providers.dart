@@ -60,3 +60,26 @@ final dossierFinancierProvider =
   });
   return response.data as Map<String, dynamic>;
 });
+
+/// Inscription active d'un étudiant pour une année — miroir de `inscriptionActive`
+/// (`ChangerClasseDialog` / `PaiementsEtudiantDialog`, EtudiantsPanel.jsx).
+final inscriptionActiveProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, ({int etudiantId, int? anneeScolaireId})>((ref, args) async {
+  if (args.anneeScolaireId == null) return null;
+  final resultats = await ResourceService('/inscriptions').list({
+    'etudiant': args.etudiantId,
+    'annee_scolaire': args.anneeScolaireId,
+  });
+  return resultats.isEmpty ? null : resultats.first;
+});
+
+/// Paiements d'écolage d'un étudiant pour une année — miroir de `mesPaiements`
+/// (`PaiementsEtudiantDialog`, EtudiantsPanel.jsx).
+final paiementsDeLetudiantProvider =
+    FutureProvider.autoDispose.family<List<Map<String, dynamic>>, ({int etudiantId, int? anneeScolaireId})>((ref, args) async {
+  if (args.anneeScolaireId == null) return [];
+  return ResourceService('/paiements').list({
+    'etudiant': args.etudiantId,
+    'annee_scolaire': args.anneeScolaireId,
+  });
+});
