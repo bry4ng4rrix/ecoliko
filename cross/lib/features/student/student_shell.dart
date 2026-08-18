@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/widgets/role_shell.dart';
 import '../communication/communication_screen.dart';
+import 'screens/student_academique_screen.dart';
 import 'screens/student_dashboard_screen.dart';
 import 'screens/student_edt_screen.dart';
 import 'screens/student_notes_screen.dart';
@@ -15,6 +16,7 @@ import 'screens/student_documents_screen.dart';
 const _items = [
   NavItem(id: 'home', label: 'Tableau de bord', icon: Icons.home_rounded),
   NavItem(id: 'profil', label: 'Mon Profil', icon: Icons.person_rounded),
+  NavItem(id: 'academique', label: 'Gestion Académique', icon: Icons.layers_rounded),
   NavItem(id: 'edt', label: 'Emploi du Temps', icon: Icons.calendar_month_rounded),
   NavItem(id: 'devoirs', label: 'Devoirs', icon: Icons.assignment_rounded),
   NavItem(id: 'notes', label: 'Notes & Résultats', icon: Icons.bar_chart_rounded),
@@ -38,6 +40,8 @@ class StudentShell extends StatelessWidget {
             return const StudentDashboardScreen();
           case 'profil':
             return const StudentProfilScreen();
+          case 'academique':
+            return const StudentAcademiqueScreen();
           case 'edt':
             return const StudentEdtScreen();
           case 'devoirs':

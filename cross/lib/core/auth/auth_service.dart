@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
+
 import '../api/api_client.dart';
 import '../api/token_storage.dart';
 import '../../models/user.dart';
@@ -20,6 +23,22 @@ class AuthService {
 
   Future<AppUser> fetchProfile() async {
     final response = await _dio.get('/auth/profile/');
+    return AppUser.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Miroir de `MonProfilPanel.jsx` : mise à jour partielle (nom/prénom/téléphone + photo
+  /// optionnelle). `XFile` (image_picker) fonctionne aussi bien mobile/desktop que web —
+  /// contrairement à `dart:io File`, il expose `readAsBytes()` sur toutes les plateformes.
+  Future<AppUser> updateProfile(Map<String, dynamic> champs, {XFile? photo}) async {
+    if (photo != null) {
+      final form = FormData.fromMap({
+        ...champs,
+        'photo': MultipartFile.fromBytes(await photo.readAsBytes(), filename: photo.name),
+      });
+      final response = await _dio.patch('/auth/profile/', data: form);
+      return AppUser.fromJson(response.data as Map<String, dynamic>);
+    }
+    final response = await _dio.patch('/auth/profile/', data: champs);
     return AppUser.fromJson(response.data as Map<String, dynamic>);
   }
 

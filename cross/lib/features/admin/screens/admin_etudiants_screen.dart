@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/common.dart';
 import '../admin_providers.dart';
+import '../widgets/etudiant_detail_sheet.dart';
 
 /// Miroir simplifié de `EtudiantsPanel` (frontend/src/components/etudiants/EtudiantsPanel.jsx) :
 /// liste + recherche. La création/modification d'un dossier élève reste à porter.
@@ -19,6 +20,14 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
   @override
   Widget build(BuildContext context) {
     final etudiantsAsync = ref.watch(adminEtudiantsProvider);
+    final anneesAsync = ref.watch(adminAnneesScolairesProvider);
+    final anneeActiveId = anneesAsync.maybeWhen(
+      data: (annees) {
+        final actives = annees.where((a) => a['est_active'] == true).toList();
+        return actives.isNotEmpty ? actives.first['id'] as int : (annees.isNotEmpty ? annees.first['id'] as int : null);
+      },
+      orElse: () => null,
+    );
 
     return etudiantsAsync.when(
       loading: () => const LoadingView(),
@@ -55,6 +64,8 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                         leading: UserAvatar(photoUrl: e['photo'] as String?, initials: _initials(e)),
                         title: Text('${e['prenom']} ${e['nom']}', style: const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text('${e['matricule'] ?? '—'} · ${e['classe_actuelle'] ?? 'Non affecté'}'),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: () => ouvrirDetailEtudiant(context, e, anneeScolaireId: anneeActiveId),
                       ),
                     )),
               const SizedBox(height: 24),

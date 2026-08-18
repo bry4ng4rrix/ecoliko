@@ -42,3 +42,21 @@ final classementTrimestreProvider = FutureProvider.family<List<Map<String, dynam
   final response = await ApiClient.instance.dio.get('/classes/${args.classeId}/classement/', queryParameters: {'trimestre': args.trimestreId});
   return (response.data as List).cast<Map<String, dynamic>>();
 });
+
+/// Parents/tuteurs d'un étudiant — miroir de `InfosEtudiantParentsDialog`
+/// (frontend/src/components/etudiants/EtudiantsPanel.jsx).
+final tuteursDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
+  (ref, etudiantId) => ResourceService('/tuteurs').list({'etudiant': etudiantId}),
+);
+
+/// Dossier financier (total dû/payé/reste) d'un étudiant pour une année — miroir de
+/// `fetchDossierFinancier` (frontend/src/services/index.js).
+final dossierFinancierProvider =
+    FutureProvider.autoDispose.family<Map<String, dynamic>?, ({int etudiantId, int? anneeScolaireId})>((ref, args) async {
+  if (args.anneeScolaireId == null) return null;
+  final response = await ApiClient.instance.dio.get('/paiements/dossier/', queryParameters: {
+    'etudiant': args.etudiantId,
+    'annee_scolaire': args.anneeScolaireId,
+  });
+  return response.data as Map<String, dynamic>;
+});

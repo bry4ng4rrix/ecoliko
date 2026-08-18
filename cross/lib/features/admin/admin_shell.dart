@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../core/widgets/common.dart';
 import '../../core/widgets/role_shell.dart';
+import '../communication/communication_screen.dart';
+import 'screens/admin_academique_screen.dart';
+import 'screens/admin_administrative_screen.dart';
 import 'screens/admin_dashboard_screen.dart';
+import 'screens/admin_edt_screen.dart';
 import 'screens/admin_etudiants_screen.dart';
+import 'screens/admin_inscriptions_screen.dart';
 import 'screens/admin_notes_screen.dart';
+import 'screens/admin_personnel_screen.dart';
+import 'screens/admin_presence_screen.dart';
+import 'screens/admin_rapports_screen.dart';
 
 /// Miroir de AdminDashboard.jsx (frontend/src/pages/AdminDashboard.jsx).
 const _items = [
@@ -36,23 +43,23 @@ class AdminShell extends StatelessWidget {
           case 'etudiants':
             return const AdminEtudiantsScreen();
           case 'inscriptions':
-            return const ComingSoonView(feature: "Demandes d'inscription");
+            return const AdminInscriptionsScreen();
           case 'enseignants':
-            return const ComingSoonView(feature: 'Gestion des Profs');
+            return const AdminPersonnelScreen(roleFilter: 'ENSEIGNANT', title: 'Gestion des Profs');
           case 'academique':
-            return const ComingSoonView(feature: 'Gestion Académique');
+            return const AdminAcademiqueScreen();
           case 'emploi-du-temps':
-            return const ComingSoonView(feature: 'Emploi du Temps');
+            return const AdminEdtScreen();
           case 'notes':
             return const AdminNotesScreen();
           case 'presence':
-            return const ComingSoonView(feature: 'Présence & Absences');
+            return const AdminPresenceScreen();
           case 'admin':
-            return const ComingSoonView(feature: 'Gestion Administrative (paiements, documents, utilisateurs)');
+            return const AdminAdministrativeScreen();
           case 'communication':
-            return const ComingSoonView(feature: 'Communication');
+            return const CommunicationScreen();
           case 'rapports':
-            return const ComingSoonView(feature: 'Rapports & Stats');
+            return const AdminRapportsScreen();
           default:
             return const SizedBox.shrink();
         }

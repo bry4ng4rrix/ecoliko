@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/common.dart';
 import '../admin_providers.dart';
+import '../widgets/distribution_classe_radar_chart.dart';
+import '../widgets/taux_par_trimestre_chart.dart';
 
 /// Miroir de `DashboardOverview` (frontend/src/pages/AdminDashboard.jsx) — cartes de
-/// synthèse ; les graphiques (Area/Radar chart) restent à porter (voir ROADMAP.md).
+/// synthèse + graphiques Area (taux par trimestre) et Radar (distribution par classe).
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
@@ -70,6 +72,21 @@ class AdminDashboardScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 20),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Taux par trimestre', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                      Text('Réussite, absence et retard', style: TextStyle(fontSize: 12.5, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      const SizedBox(height: 12),
+                      TauxParTrimestreChart(anneeScolaireId: anneeActiveId),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
               Text('Distribution par classe', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
               classesAsync.when(
@@ -77,29 +94,11 @@ class AdminDashboardScreen extends ConsumerWidget {
                 error: (e, _) => const ErrorView(message: 'Classes indisponibles'),
                 data: (classes) {
                   if (classes.isEmpty) return const EmptyView(message: "Aucune classe pour l'année scolaire active.");
-                  return GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.3,
-                    children: classes.map((c) {
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(c['nom']?.toString() ?? '', style: TextStyle(fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary)),
-                              const SizedBox(height: 6),
-                              Text('${c['effectif']}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
-                              Text('élèves', style: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                  return Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: DistributionClasseRadarChart(classes: classes),
+                    ),
                   );
                 },
               ),

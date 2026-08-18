@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_provider.dart';
+import '../../features/parametres/mon_profil_screen.dart';
 import '../../models/user.dart';
 import 'common.dart';
 
@@ -156,6 +157,18 @@ class _RoleShellState extends ConsumerState<RoleShell> {
                 ],
               ),
               const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.tonalIcon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MonProfilScreen()));
+                  },
+                  icon: const Icon(Icons.edit_rounded),
+                  label: const Text('Modifier mon profil'),
+                ),
+              ),
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(

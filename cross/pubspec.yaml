@@ -58,6 +58,9 @@ dependencies:
   # Nombres/dates formatés, "il y a 5 min", etc.
   timeago: ^3.7.0
 
+  # Graphiques du tableau de bord Admin (équivalent recharts côté web)
+  fl_chart: ^0.69.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
