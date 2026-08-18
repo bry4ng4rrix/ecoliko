@@ -66,7 +66,16 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    final access = await TokenStorage.instance.readAccess();
+    // Un échec de lecture (ex. trousseau/Secret Service indisponible sur certains
+    // environnements Linux sans gnome-keyring/kwallet actif) ne doit pas faire échouer
+    // TOUTES les requêtes — on part alors du principe qu'il n'y a pas de session, plutôt
+    // que de laisser l'exception remonter et transformer chaque appel en erreur réseau.
+    String? access;
+    try {
+      access = await TokenStorage.instance.readAccess();
+    } catch (_) {
+      access = null;
+    }
     if (access != null) {
       options.headers['Authorization'] = 'Bearer $access';
     }
@@ -85,14 +94,14 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
-    final refresh = await TokenStorage.instance.readRefresh();
-    if (refresh == null) {
-      await TokenStorage.instance.clear();
-      handler.next(err);
-      return;
-    }
-
     try {
+      final refresh = await TokenStorage.instance.readRefresh();
+      if (refresh == null) {
+        await TokenStorage.instance.clear();
+        handler.next(err);
+        return;
+      }
+
       _refreshing ??= _doRefresh(refresh);
       final newAccess = await _refreshing;
       _refreshing = null;
@@ -105,7 +114,11 @@ class _AuthInterceptor extends Interceptor {
       handler.resolve(response);
     } catch (_) {
       _refreshing = null;
-      await TokenStorage.instance.clear();
+      try {
+        await TokenStorage.instance.clear();
+      } catch (_) {
+        // Stockage sécurisé indisponible : rien de plus à faire.
+      }
       handler.next(err);
     }
   }

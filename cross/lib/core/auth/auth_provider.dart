@@ -54,7 +54,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    await _service.logout();
+    // Même si l'effacement du stockage sécurisé échoue (trousseau indisponible), l'état
+    // applicatif doit repasser "non connecté" — sinon l'utilisateur reste bloqué sur son
+    // tableau de bord sans pouvoir revenir à l'écran de connexion.
+    try {
+      await _service.logout();
+    } catch (_) {
+      // Ignoré volontairement, voir commentaire ci-dessus.
+    }
     state = const AuthState(isLoading: false);
   }
 
