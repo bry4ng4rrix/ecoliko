@@ -128,13 +128,18 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
       if (paiementInscription != null) {
         await dio.patch('/paiements/${paiementInscription['id']}/', data: {'statut': dejaPaye ? 'EN_ATTENTE' : 'PAYE'});
       } else {
+        // `dejaPaye` peut être vrai sans qu'un paiement "droit d'inscription" taggé
+        // n'existe encore (le statut se déduit aussi du cumul des écolages mensuels déjà
+        // payés, voir `droitInscriptionPaye` plus bas) — si l'action demandée est "marquer
+        // non payé" dans ce cas, créer quand même un enregistrement PAYE serait contraire à
+        // l'action cliquée.
         await dio.post('/paiements/', data: {
           'etudiant': _etudiantId,
           'annee_scolaire': anneeActive['id'],
           'montant': montantInscription ?? 0,
           'date_echeance': anneeActive['date_debut'],
           'mois_couvert': (anneeActive['mois_debut_annee_scolaire'] as num?)?.toInt() ?? 9,
-          'statut': 'PAYE',
+          'statut': dejaPaye ? 'EN_ATTENTE' : 'PAYE',
           'commentaire': _marqueurInscription,
         });
       }
