@@ -28,15 +28,26 @@ class PaiementEcolageViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.is_superuser:
-            return qs
-
         role = getattr(user, 'role', None)
-        if role == User.Role.ETUDIANT:
-            return qs.filter(etudiant__utilisateur=user)
-        if role == User.Role.PARENT:
-            return qs.filter(etudiant__tuteurs__parent=user).distinct()
-        return qs  # ADMIN / RESPONSABLE / SECRETARIAT
+        if not user.is_superuser:
+            if role == User.Role.ETUDIANT:
+                qs = qs.filter(etudiant__utilisateur=user)
+            elif role == User.Role.PARENT:
+                qs = qs.filter(etudiant__tuteurs__parent=user).distinct()
+            # ADMIN / RESPONSABLE / SECRETARIAT : tout l'établissement
+
+        # `?etudiant=`/`?annee_scolaire=` restreignent la liste à un dossier précis — sans ce
+        # filtre, tout appelant (y compris le personnel) recevait TOUS les paiements de
+        # l'établissement, quel que soit l'étudiant demandé (le frontend web compensait en
+        # filtrant côté client, ce que l'app Flutter ne fait pas — d'où des paiements d'autres
+        # élèves apparaissant dans le suivi mensuel d'un élève donné).
+        etudiant_id = self.request.query_params.get('etudiant')
+        if etudiant_id:
+            qs = qs.filter(etudiant_id=etudiant_id)
+        annee_scolaire_id = self.request.query_params.get('annee_scolaire')
+        if annee_scolaire_id:
+            qs = qs.filter(annee_scolaire_id=annee_scolaire_id)
+        return qs
 
     def get_permissions(self):
         if self.action in ('create', 'update', 'partial_update', 'destroy', 'synthese'):

@@ -99,3 +99,11 @@ final fraisScolariteProvider = FutureProvider<List<Map<String, dynamic>>>((ref) 
 final documentsDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
   (ref, etudiantId) => ResourceService('/documents-etudiants').list({'etudiant': etudiantId}),
 );
+
+/// Matières de l'établissement — miroir de `matieres` (`PersonnelPanel.jsx`), utilisé pour
+/// afficher/éditer les matières enseignées par un enseignant.
+final adminMatieresProvider = FutureProvider<List<Map<String, dynamic>>>((ref) => ResourceService('/matieres').list());
+
+/// Dossiers RH (salaire, contrat...) des enseignants — miroir de `dossiersRH`
+/// (`PersonnelPanel.jsx`).
+final adminDossiersEnseignantsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) => ResourceService('/dossiers-enseignants').list());
