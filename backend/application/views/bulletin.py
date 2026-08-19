@@ -21,17 +21,28 @@ class BulletinViewSet(EcoleScopedQuerysetMixin, viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.is_superuser:
-            return qs
-
         role = getattr(user, 'role', None)
-        if role == User.Role.ETUDIANT:
-            return qs.filter(etudiant__utilisateur=user)
-        if role == User.Role.PARENT:
-            return qs.filter(etudiant__tuteurs__parent=user).distinct()
-        if role == User.Role.ENSEIGNANT:
-            return qs.filter(classe__in=scoping.classes_du_professeur(user))
-        return qs  # ADMIN / RESPONSABLE / SECRETARIAT
+        if not user.is_superuser:
+            if role == User.Role.ETUDIANT:
+                qs = qs.filter(etudiant__utilisateur=user)
+            elif role == User.Role.PARENT:
+                qs = qs.filter(etudiant__tuteurs__parent=user).distinct()
+            elif role == User.Role.ENSEIGNANT:
+                qs = qs.filter(classe__in=scoping.classes_du_professeur(user))
+            # ADMIN / RESPONSABLE / SECRETARIAT : tout l'établissement
+
+        # `?etudiant=`/`?trimestre=`/`?annee_scolaire=` restreignent la liste (même bug de
+        # filtre manquant que PaiementEcolageViewSet/NoteViewSet).
+        etudiant_id = self.request.query_params.get('etudiant')
+        if etudiant_id:
+            qs = qs.filter(etudiant_id=etudiant_id)
+        trimestre_id = self.request.query_params.get('trimestre')
+        if trimestre_id:
+            qs = qs.filter(trimestre_id=trimestre_id)
+        annee_scolaire_id = self.request.query_params.get('annee_scolaire')
+        if annee_scolaire_id:
+            qs = qs.filter(annee_scolaire_id=annee_scolaire_id)
+        return qs
 
     def get_permissions(self):
         if self.action == 'generer':

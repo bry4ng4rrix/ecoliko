@@ -107,3 +107,14 @@ final adminMatieresProvider = FutureProvider<List<Map<String, dynamic>>>((ref) =
 /// Dossiers RH (salaire, contrat...) des enseignants — miroir de `dossiersRH`
 /// (`PersonnelPanel.jsx`).
 final adminDossiersEnseignantsProvider = FutureProvider<List<Map<String, dynamic>>>((ref) => ResourceService('/dossiers-enseignants').list());
+
+/// Notes d'un étudiant, toutes matières/trimestres confondus — pour le récapitulatif
+/// "Bulletin" de la Gestion Étudiants.
+final notesDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
+  (ref, etudiantId) => ResourceService('/notes').list({'etudiant': etudiantId}),
+);
+
+/// Bulletins déjà générés/validés pour un étudiant (moyenne, rang, mention par trimestre).
+final bulletinsDeLetudiantProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, int>(
+  (ref, etudiantId) => ResourceService('/bulletins').list({'etudiant': etudiantId}),
+);

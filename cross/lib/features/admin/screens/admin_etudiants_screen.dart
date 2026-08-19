@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/resource_service.dart';
 import '../../../core/widgets/common.dart';
 import '../admin_providers.dart';
+import '../widgets/bulletin_etudiant_sheet.dart';
 import '../widgets/changer_classe_dialog.dart';
 import '../widgets/dossier_etudiant_sheet.dart';
 import '../widgets/etudiant_detail_sheet.dart';
@@ -22,6 +23,7 @@ class AdminEtudiantsScreen extends ConsumerStatefulWidget {
 
 class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
   String _query = '';
+  String? _classeFiltre;
 
   Future<void> _supprimer(Map<String, dynamic> etudiant) async {
     final confirme = await showDialog<bool>(
@@ -61,19 +63,21 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
       orElse: () => null,
     );
 
+    final classesAsync = ref.watch(adminClassesProvider);
+
     return etudiantsAsync.when(
       loading: () => const LoadingView(),
       error: (e, _) => ErrorView(message: 'Élèves indisponibles', onRetry: () => ref.invalidate(adminEtudiantsProvider)),
       data: (etudiants) {
         final q = _query.trim().toLowerCase();
-        final filtres = q.isEmpty
-            ? etudiants
-            : etudiants.where((e) {
-                final matricule = (e['matricule']?.toString() ?? '').toLowerCase();
-                final nom = (e['nom']?.toString() ?? '').toLowerCase();
-                final prenom = (e['prenom']?.toString() ?? '').toLowerCase();
-                return matricule.contains(q) || nom.contains(q) || prenom.contains(q);
-              }).toList();
+        final filtres = etudiants.where((e) {
+          final matricule = (e['matricule']?.toString() ?? '').toLowerCase();
+          final nom = (e['nom']?.toString() ?? '').toLowerCase();
+          final prenom = (e['prenom']?.toString() ?? '').toLowerCase();
+          final matchQuery = q.isEmpty || matricule.contains(q) || nom.contains(q) || prenom.contains(q);
+          final matchClasse = _classeFiltre == null || e['classe_actuelle'] == _classeFiltre;
+          return matchQuery && matchClasse;
+        }).toList();
 
         return RefreshIndicator(
           onRefresh: () async => ref.invalidate(adminEtudiantsProvider),
@@ -93,6 +97,38 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                   TextField(
                     decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Rechercher un élève...'),
                     onChanged: (v) => setState(() => _query = v),
+                  ),
+                  const SizedBox(height: 10),
+                  classesAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (e, _) => const SizedBox.shrink(),
+                    data: (classes) {
+                      final noms = classes.map((c) => c['nom']?.toString() ?? '').where((n) => n.isNotEmpty).toSet().toList()..sort();
+                      return SizedBox(
+                        height: 36,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChoiceChip(
+                                label: const Text('Toutes les classes'),
+                                selected: _classeFiltre == null,
+                                onSelected: (_) => setState(() => _classeFiltre = null),
+                              ),
+                            ),
+                            ...noms.map((nom) => Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: ChoiceChip(
+                                    label: Text(nom),
+                                    selected: _classeFiltre == nom,
+                                    onSelected: (_) => setState(() => _classeFiltre = _classeFiltre == nom ? null : nom),
+                                  ),
+                                )),
+                          ],
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 14),
                   Text('${filtres.length} élève(s)', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12.5)),
@@ -117,6 +153,9 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                                   case 'infos':
                                     ouvrirDetailEtudiant(context, e);
                                     break;
+                                  case 'bulletin':
+                                    ouvrirBulletinEtudiant(context, e);
+                                    break;
                                   case 'paiements':
                                     ouvrirPaiementsEtudiant(context, e, anneeScolaireId: anneeActiveId);
                                     break;
@@ -134,6 +173,7 @@ class _AdminEtudiantsScreenState extends ConsumerState<AdminEtudiantsScreen> {
                               itemBuilder: (context) => const [
                                 PopupMenuItem(value: 'dossier', child: ListTile(leading: Icon(Icons.description_outlined), title: Text('Dossier'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'infos', child: ListTile(leading: Icon(Icons.people_outline_rounded), title: Text('Infos élève et parents'), contentPadding: EdgeInsets.zero)),
+                                PopupMenuItem(value: 'bulletin', child: ListTile(leading: Icon(Icons.grade_outlined), title: Text('Bulletin'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'paiements', child: ListTile(leading: Icon(Icons.account_balance_wallet_outlined), title: Text('Paiements'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'classe', child: ListTile(leading: Icon(Icons.swap_horiz_rounded), title: Text('Changer de classe'), contentPadding: EdgeInsets.zero)),
                                 PopupMenuItem(value: 'modifier', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Modifier'), contentPadding: EdgeInsets.zero)),

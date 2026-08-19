@@ -33,17 +33,29 @@ class NoteViewSet(EcoleScopedQuerysetMixin, viewsets.ModelViewSet):
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
-        if user.is_superuser:
-            return qs
-
         role = getattr(user, 'role', None)
-        if role == 'ENSEIGNANT':
-            return qs.filter(matiere__enseignant=user)
-        if role == 'ETUDIANT':
-            return qs.filter(etudiant__utilisateur=user)
-        if role == 'PARENT':
-            return qs.filter(etudiant__tuteurs__parent=user).distinct()
-        return qs  # ADMIN / RESPONSABLE / SECRETARIAT
+        if not user.is_superuser:
+            if role == 'ENSEIGNANT':
+                qs = qs.filter(matiere__enseignant=user)
+            elif role == 'ETUDIANT':
+                qs = qs.filter(etudiant__utilisateur=user)
+            elif role == 'PARENT':
+                qs = qs.filter(etudiant__tuteurs__parent=user).distinct()
+            # ADMIN / RESPONSABLE / SECRETARIAT : tout l'établissement
+
+        # `?etudiant=`/`?trimestre=`/`?matiere=` restreignent la liste (voir historique de bug
+        # similaire sur PaiementEcolageViewSet : sans ce filtre, un appelant demandant les notes
+        # d'un élève précis recevait celles de tout l'établissement).
+        etudiant_id = self.request.query_params.get('etudiant')
+        if etudiant_id:
+            qs = qs.filter(etudiant_id=etudiant_id)
+        trimestre_id = self.request.query_params.get('trimestre')
+        if trimestre_id:
+            qs = qs.filter(trimestre_id=trimestre_id)
+        matiere_id = self.request.query_params.get('matiere')
+        if matiere_id:
+            qs = qs.filter(matiere_id=matiere_id)
+        return qs
 
     @action(detail=False, methods=['get'], url_path='moyenne')
     def moyenne(self, request):
