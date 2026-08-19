@@ -21,7 +21,7 @@ class StudentEdtScreen extends ConsumerWidget {
         child: ListView(
           children: [
             const SectionHeader(title: 'Emploi du Temps', subtitle: 'Votre planning hebdomadaire'),
-            EdtAgendaList(creneaux: creneaux),
+            EdtWeekGrid(creneaux: creneaux),
           ],
         ),
       ),
