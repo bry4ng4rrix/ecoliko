@@ -12,20 +12,24 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+import environ
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# Toutes les valeurs ci-dessous restent utilisables telles quelles en local (aucun `.env`
+# requis, mêmes valeurs par défaut qu'avant) ; en production (Docker/VPS), `.env` ou les
+# variables d'environnement du conteneur les surchargent — voir `backend/.env.example`.
+env = environ.Env()
+environ.Env.read_env(BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-$q4%b!hh&(qd3+8x2n0wxhiaus8*i&6(c&*%y^uewj+qgudl)3'
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-$q4%b!hh&(qd3+8x2n0wxhiaus8*i&6(c&*%y^uewj+qgudl)3')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 
 
 # Application definition
@@ -50,13 +54,30 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-CORS_ALLOW_ALL_ORIGINS = True
+# `CORS_ALLOW_ALL_ORIGINS=True` par défaut (comme avant) ; en production, définir
+# `CORS_ALLOWED_ORIGINS` (liste précise) désactive automatiquement le "tout autoriser".
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL_ORIGINS', default=not CORS_ALLOWED_ORIGINS)
+
+# Cache : LocMemCache par défaut (rien à installer en local) ; passe sur Redis dès que
+# `REDIS_URL` est définie (voir le service `redis` de docker-compose.yml).
+REDIS_URL = env('REDIS_URL', default='')
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
+        }
+    }
+
 # Configuration de REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -116,10 +137,7 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db('DATABASE_URL', default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'),
 }
 
 
@@ -158,7 +176,12 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 
 # Fichiers médias (photos de profil, logos d'établissement, etc.)
 MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = env('MEDIA_ROOT', default=str(BASE_DIR / 'media'))
