@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/common.dart';
 import '../student_providers.dart';
+import '../widgets/bulletins_card.dart';
 
 /// Miroir de `StudentDashboardOverview` (frontend/src/pages/StudentDashboard.jsx).
 class StudentDashboardScreen extends ConsumerWidget {
@@ -21,6 +22,7 @@ class StudentDashboardScreen extends ConsumerWidget {
         ref.invalidate(trimestresProvider);
         ref.invalidate(notesProvider);
         ref.invalidate(matieresProvider);
+        ref.invalidate(bulletinsProvider);
       },
       child: ListView(
         children: [
@@ -103,6 +105,8 @@ class StudentDashboardScreen extends ConsumerWidget {
             loading: () => const LoadingView(),
             error: (e, _) => const ErrorView(message: 'Trimestres indisponibles'),
           ),
+          const SizedBox(height: 20),
+          const BulletinsCard(),
           const SizedBox(height: 24),
         ],
       ),
