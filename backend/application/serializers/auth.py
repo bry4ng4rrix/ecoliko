@@ -2,7 +2,8 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from ..models import Ecole, User, Etudiant, TuteurEtudiant
+from ..models import AnneeScolaire, Classe, Ecole, User, Etudiant, Inscription, TuteurEtudiant
+from ..services.matricule import generer_matricule
 from .demandes_inscription import DemandeInscriptionSuiviSerializer, PieceJointeInscriptionSerializer
 
 MOT_DE_PASSE_TEMPORAIRE = '12345678'
@@ -64,13 +65,36 @@ class RegisterSerializer(serializers.ModelSerializer):
     Les comptes créés ici sont toujours inactifs (`is_active=False`) : ils doivent
     être activés par un administrateur de l'établissement, ce qui empêche la création
     de comptes utilisables directement depuis un point d'entrée public non vérifié.
+
+    Pour le rôle ÉTUDIANT, le dossier `Etudiant` complet (miroir du formulaire "Inscription
+    nouvel étudiant" du personnel — EtudiantsPanel.jsx) est créé dans la foulée, pour que
+    l'administrateur qui active le compte n'ait pas à ressaisir toutes ces informations : seul
+    le matricule est exclu de la saisie publique (généré côté serveur, voir
+    `services.matricule.generer_matricule`) et la classe reste une simple préférence
+    (l'inscription à la classe choisie est créée mais reste modifiable par l'admin).
     """
     password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'})
     matricule_enfant = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
+    # Champs du dossier étudiant, sans équivalent sur `User` (voir docstring ci-dessus).
+    nationalite = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    situation_familiale = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    ancien_etablissement = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    dossier_medical = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    contact_urgence_nom = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    contact_urgence_telephone = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    classe = serializers.PrimaryKeyRelatedField(queryset=Classe.objects.all(), write_only=True, required=False, allow_null=True)
+
     class Meta:
         model = User
-        fields = ('id', 'email', 'password', 'first_name', 'last_name', 'role', 'genre', 'ecole', 'matricule_enfant')
+        fields = (
+            'id', 'email', 'password', 'first_name', 'last_name', 'role', 'genre', 'ecole', 'matricule_enfant',
+            # Déjà des champs de `User` (voir `DemandeInscriptionSerializer`) — collectés ici plutôt que
+            # de laisser l'admin les ressaisir à l'activation.
+            'telephone', 'photo', 'date_naissance', 'lieu_naissance', 'adresse',
+            'nationalite', 'situation_familiale', 'ancien_etablissement', 'dossier_medical',
+            'contact_urgence_nom', 'contact_urgence_telephone', 'classe',
+        )
         extra_kwargs = {
             'first_name': {'required': True},
             'last_name': {'required': True},
@@ -87,8 +111,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # If registering as parent, require matricule_enfant
         role = attrs.get('role')
+        # If registering as parent, require matricule_enfant
         if role == User.Role.PARENT:
             matricule = attrs.get('matricule_enfant')
             if not matricule:
@@ -99,6 +123,16 @@ class RegisterSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({'matricule_enfant': "Aucun étudiant trouvé avec ce matricule."})
             # attach found student object to attrs for use in create()
             attrs['_matricule_enfant_obj'] = etu
+        # Le dossier étudiant a besoin au minimum de la date et du lieu de naissance
+        # (champs obligatoires du modèle `Etudiant`) — le reste reste facultatif.
+        elif role == User.Role.ETUDIANT:
+            manquants = {}
+            if not attrs.get('date_naissance'):
+                manquants['date_naissance'] = 'La date de naissance est requise.'
+            if not attrs.get('lieu_naissance'):
+                manquants['lieu_naissance'] = 'Le lieu de naissance est requis.'
+            if manquants:
+                raise serializers.ValidationError(manquants)
         return attrs
 
     @transaction.atomic
@@ -107,6 +141,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         etu = validated_data.pop('_matricule_enfant_obj', None)
         # Remove raw matricule field so it isn't passed to User.create_user
         validated_data.pop('matricule_enfant', None)
+        # Champs réservés au dossier `Etudiant`, sans colonne sur `User`.
+        dossier_etudiant = {
+            champ: validated_data.pop(champ, None)
+            for champ in (
+                'nationalite', 'situation_familiale', 'ancien_etablissement', 'dossier_medical',
+                'contact_urgence_nom', 'contact_urgence_telephone', 'classe',
+            )
+        }
+        classe = dossier_etudiant.pop('classe', None)
         # Ensure account inactive by default
         validated_data['is_active'] = False
 
@@ -119,6 +162,25 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Create tuteur link when registering as parent
         if validated_data.get('role') == User.Role.PARENT and etu is not None:
             TuteurEtudiant.objects.create(parent=user, etudiant=etu, relation=TuteurEtudiant.Relation.AUTRE)
+
+        if validated_data.get('role') == User.Role.ETUDIANT:
+            etudiant = Etudiant.objects.create(
+                ecole=user.ecole, utilisateur=user, matricule=generer_matricule(user.ecole),
+                nom=user.last_name, prenom=user.first_name, genre=user.genre or Etudiant.Genre.AUTRE,
+                date_naissance=user.date_naissance, lieu_naissance=user.lieu_naissance,
+                nationalite=dossier_etudiant.get('nationalite') or 'Malagasy',
+                adresse=user.adresse, telephone=user.telephone, email=user.email,
+                photo=user.photo.name if user.photo else None,
+                situation_familiale=dossier_etudiant.get('situation_familiale') or None,
+                ancien_etablissement=dossier_etudiant.get('ancien_etablissement') or None,
+                dossier_medical=dossier_etudiant.get('dossier_medical') or None,
+                contact_urgence_nom=dossier_etudiant.get('contact_urgence_nom') or None,
+                contact_urgence_telephone=dossier_etudiant.get('contact_urgence_telephone') or None,
+            )
+            if classe is not None:
+                annee_active = AnneeScolaire.objects.filter(ecole=user.ecole, est_active=True).first()
+                if annee_active is not None:
+                    Inscription.objects.create(etudiant=etudiant, classe=classe, annee_scolaire=annee_active)
 
         return user
 

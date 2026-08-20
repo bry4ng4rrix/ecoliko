@@ -1,6 +1,10 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_service.dart';
@@ -248,6 +252,37 @@ Widget darkDropdown<T>({
   );
 }
 
+/// Sélecteur de date au même thème sombre que [darkField] — `showDatePicker` n'a pas
+/// d'équivalent "champ texte" natif, contrairement à un `TextFormField`.
+Widget darkDateField({required String label, required DateTime? value, required VoidCallback onTap, bool required = true}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text('$label${required ? ' *' : ''}', style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12.5, fontWeight: FontWeight.w500)),
+      const SizedBox(height: 6),
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(10), border: Border.all(color: const Color(0xFF1E293B))),
+          child: Row(
+            children: [
+              const Icon(Icons.calendar_today_outlined, color: Color(0xFF94A3B8), size: 16),
+              const SizedBox(width: 10),
+              Text(
+                value != null ? DateFormat('dd/MM/yyyy').format(value) : 'jj/mm/aaaa',
+                style: TextStyle(color: value != null ? Colors.white : const Color(0xFF64748B), fontSize: 13.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
 class _JoinForm extends StatefulWidget {
   final bool loading;
   final ValueChanged<bool> onSubmitting;
@@ -267,6 +302,22 @@ class _JoinFormState extends State<_JoinForm> {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _matriculeEnfantCtrl = TextEditingController();
+  // Dossier étudiant (rôle Élève uniquement) — miroir de « Inscription nouvel étudiant »
+  // (frontend/src/components/etudiants/EtudiantsPanel.jsx), pour que l'administration n'ait
+  // pas à ressaisir ces informations à l'activation du compte. Le matricule et la classe ne
+  // sont volontairement pas demandés ici : le matricule est généré côté serveur, et affecter
+  // une classe reste une décision de l'établissement à l'activation.
+  final _lieuNaissanceCtrl = TextEditingController();
+  final _nationaliteCtrl = TextEditingController(text: 'Malagasy');
+  final _adresseCtrl = TextEditingController();
+  final _telephoneCtrl = TextEditingController();
+  final _situationFamilialeCtrl = TextEditingController();
+  final _ancienEtablissementCtrl = TextEditingController();
+  final _dossierMedicalCtrl = TextEditingController();
+  final _contactUrgenceNomCtrl = TextEditingController();
+  final _contactUrgenceTelCtrl = TextEditingController();
+  DateTime? _dateNaissance;
+  XFile? _photo;
   String _role = 'ETUDIANT';
   String _genre = 'H';
   int? _ecoleId;
@@ -292,6 +343,22 @@ class _JoinFormState extends State<_JoinForm> {
     }
   }
 
+  Future<void> _choisirDateNaissance() async {
+    final maintenant = DateTime.now();
+    final choisie = await showDatePicker(
+      context: context,
+      initialDate: DateTime(maintenant.year - 15),
+      firstDate: DateTime(1950),
+      lastDate: maintenant,
+    );
+    if (choisie != null) setState(() => _dateNaissance = choisie);
+  }
+
+  Future<void> _choisirPhoto() async {
+    final fichier = await ImagePicker().pickImage(source: ImageSource.gallery, maxWidth: 1024, imageQuality: 85);
+    if (fichier != null) setState(() => _photo = fichier);
+  }
+
   @override
   void dispose() {
     _prenomCtrl.dispose();
@@ -299,6 +366,15 @@ class _JoinFormState extends State<_JoinForm> {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     _matriculeEnfantCtrl.dispose();
+    _lieuNaissanceCtrl.dispose();
+    _nationaliteCtrl.dispose();
+    _adresseCtrl.dispose();
+    _telephoneCtrl.dispose();
+    _situationFamilialeCtrl.dispose();
+    _ancienEtablissementCtrl.dispose();
+    _dossierMedicalCtrl.dispose();
+    _contactUrgenceNomCtrl.dispose();
+    _contactUrgenceTelCtrl.dispose();
     super.dispose();
   }
 
@@ -306,6 +382,14 @@ class _JoinFormState extends State<_JoinForm> {
     if (!_formKey.currentState!.validate()) return;
     if (_role == 'PARENT' && _matriculeEnfantCtrl.text.trim().isEmpty) {
       widget.onError("Veuillez fournir le matricule de votre enfant.");
+      return;
+    }
+    if (_role == 'ETUDIANT' && _dateNaissance == null) {
+      widget.onError('La date de naissance est requise.');
+      return;
+    }
+    if (_role == 'ETUDIANT' && _lieuNaissanceCtrl.text.trim().isEmpty) {
+      widget.onError('Le lieu de naissance est requis.');
       return;
     }
     if (_passwordCtrl.text.length < 6) {
@@ -323,7 +407,19 @@ class _JoinFormState extends State<_JoinForm> {
         'genre': _genre,
         'ecole': _ecoleId,
         if (_matriculeEnfantCtrl.text.trim().isNotEmpty) 'matricule_enfant': _matriculeEnfantCtrl.text.trim(),
-      });
+        if (_role == 'ETUDIANT') ...{
+          'date_naissance': DateFormat('yyyy-MM-dd').format(_dateNaissance!),
+          'lieu_naissance': _lieuNaissanceCtrl.text.trim(),
+          if (_nationaliteCtrl.text.trim().isNotEmpty) 'nationalite': _nationaliteCtrl.text.trim(),
+          if (_adresseCtrl.text.trim().isNotEmpty) 'adresse': _adresseCtrl.text.trim(),
+          if (_telephoneCtrl.text.trim().isNotEmpty) 'telephone': _telephoneCtrl.text.trim(),
+          if (_situationFamilialeCtrl.text.trim().isNotEmpty) 'situation_familiale': _situationFamilialeCtrl.text.trim(),
+          if (_ancienEtablissementCtrl.text.trim().isNotEmpty) 'ancien_etablissement': _ancienEtablissementCtrl.text.trim(),
+          if (_dossierMedicalCtrl.text.trim().isNotEmpty) 'dossier_medical': _dossierMedicalCtrl.text.trim(),
+          if (_contactUrgenceNomCtrl.text.trim().isNotEmpty) 'contact_urgence_nom': _contactUrgenceNomCtrl.text.trim(),
+          if (_contactUrgenceTelCtrl.text.trim().isNotEmpty) 'contact_urgence_telephone': _contactUrgenceTelCtrl.text.trim(),
+        },
+      }, photo: _role == 'ETUDIANT' ? _photo : null);
       widget.onSuccess("Inscription réussie ! Votre compte doit être activé par l'administration de l'établissement avant de pouvoir vous connecter.");
       if (mounted) {
         Future.delayed(const Duration(seconds: 3), () {
@@ -402,6 +498,69 @@ class _JoinFormState extends State<_JoinForm> {
             ],
             onChanged: (v) => setState(() => _genre = v ?? 'H'),
           ),
+          if (_role == 'ETUDIANT') ...[
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFF1E293B)),
+            const SizedBox(height: 12),
+            const Text('DOSSIER ÉLÈVE', style: TextStyle(color: Color(0xFF818CF8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
+            const SizedBox(height: 10),
+            Center(
+              child: GestureDetector(
+                onTap: _choisirPhoto,
+                child: Stack(
+                  children: [
+                    _photo != null
+                        ? FutureBuilder<Uint8List>(
+                            future: _photo!.readAsBytes(),
+                            builder: (context, snapshot) => CircleAvatar(
+                              radius: 32,
+                              backgroundColor: const Color(0xFF0F172A),
+                              backgroundImage: snapshot.hasData ? MemoryImage(snapshot.data!) : null,
+                            ),
+                          )
+                        : const CircleAvatar(radius: 32, backgroundColor: Color(0xFF0F172A), child: Icon(Icons.person_outline, color: Color(0xFF64748B), size: 28)),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(5),
+                        decoration: const BoxDecoration(color: Color(0xFF4F46E5), shape: BoxShape.circle),
+                        child: const Icon(Icons.camera_alt_rounded, size: 12, color: Colors.white),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: darkDateField(label: 'Date de naissance', value: _dateNaissance, onTap: _choisirDateNaissance)),
+                const SizedBox(width: 10),
+                Expanded(child: darkField(controller: _lieuNaissanceCtrl, label: 'Lieu de naissance', hint: 'Antananarivo')),
+              ],
+            ),
+            const SizedBox(height: 14),
+            darkField(controller: _nationaliteCtrl, label: 'Nationalité', required: false),
+            const SizedBox(height: 14),
+            darkField(controller: _adresseCtrl, label: 'Adresse', required: false),
+            const SizedBox(height: 14),
+            darkField(controller: _telephoneCtrl, label: 'Téléphone', required: false, keyboardType: TextInputType.phone),
+            const SizedBox(height: 14),
+            darkField(controller: _situationFamilialeCtrl, label: 'Situation familiale', required: false, hint: 'Ex: Vit avec ses parents'),
+            const SizedBox(height: 14),
+            darkField(controller: _ancienEtablissementCtrl, label: 'Ancien établissement', required: false),
+            const SizedBox(height: 14),
+            darkField(controller: _dossierMedicalCtrl, label: 'Dossier médical', required: false, hint: 'Allergies, traitements en cours...'),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: darkField(controller: _contactUrgenceNomCtrl, label: "Contact d'urgence", required: false)),
+                const SizedBox(width: 10),
+                Expanded(child: darkField(controller: _contactUrgenceTelCtrl, label: 'Téléphone urgence', required: false, keyboardType: TextInputType.phone)),
+              ],
+            ),
+          ],
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,

@@ -143,7 +143,23 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
     genre: "H",
     ecole: "",
     matricule_enfant: "",
+    // Dossier élève (rôle Élève uniquement) — miroir de « Inscription nouvel étudiant »
+    // (components/etudiants/EtudiantsPanel.jsx), pour que l'établissement n'ait pas à
+    // ressaisir ces informations à l'activation du compte. Le matricule et la classe ne sont
+    // volontairement pas demandés ici : le matricule est généré côté serveur (voir
+    // RegisterSerializer), et affecter une classe reste une décision de l'établissement.
+    date_naissance: "",
+    lieu_naissance: "",
+    nationalite: "Malagasy",
+    adresse: "",
+    telephone: "",
+    situation_familiale: "",
+    ancien_etablissement: "",
+    dossier_medical: "",
+    contact_urgence_nom: "",
+    contact_urgence_telephone: "",
   });
+  const [photo, setPhoto] = useState(null);
   const [ecoles, setEcoles] = useState([]);
   const navigate = useNavigate();
 
@@ -179,6 +195,13 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
       setError("Veuillez fournir le matricule de votre enfant.");
       return;
     }
+    if (
+      formData.role === "ETUDIANT" &&
+      (!formData.date_naissance || !formData.lieu_naissance)
+    ) {
+      setError("La date et le lieu de naissance sont requis.");
+      return;
+    }
     if (formData.password.length < 6) {
       setError("Le mot de passe doit contenir au moins 6 caractères");
       return;
@@ -186,7 +209,7 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
 
     setLoading(true);
     try {
-      await authService.register({
+      const champs = {
         email: formData.email.trim(),
         password: formData.password,
         first_name: formData.first_name.trim(),
@@ -195,7 +218,32 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
         genre: formData.genre,
         ecole: Number(formData.ecole),
         matricule_enfant: formData.matricule_enfant?.trim() || undefined,
-      });
+      };
+      if (formData.role === "ETUDIANT") {
+        Object.assign(champs, {
+          date_naissance: formData.date_naissance,
+          lieu_naissance: formData.lieu_naissance.trim(),
+          nationalite: formData.nationalite.trim() || undefined,
+          adresse: formData.adresse.trim() || undefined,
+          telephone: formData.telephone.trim() || undefined,
+          situation_familiale: formData.situation_familiale.trim() || undefined,
+          ancien_etablissement: formData.ancien_etablissement.trim() || undefined,
+          dossier_medical: formData.dossier_medical.trim() || undefined,
+          contact_urgence_nom: formData.contact_urgence_nom.trim() || undefined,
+          contact_urgence_telephone:
+            formData.contact_urgence_telephone.trim() || undefined,
+        });
+      }
+
+      let payload = champs;
+      if (formData.role === "ETUDIANT" && photo) {
+        payload = new FormData();
+        Object.entries(champs).forEach(([key, value]) => {
+          if (value !== undefined) payload.append(key, value);
+        });
+        payload.append("photo", photo);
+      }
+      await authService.register(payload);
 
       setSuccess(
         "Inscription réussie ! Votre compte doit être activé par l'administration de l'établissement avant de pouvoir vous connecter.",
@@ -208,6 +256,8 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
           data?.password?.[0] ||
           data?.role?.[0] ||
           data?.ecole?.[0] ||
+          data?.date_naissance?.[0] ||
+          data?.lieu_naissance?.[0] ||
           data?.non_field_errors?.[0] ||
           data?.detail ||
           "Erreur lors de l'inscription",
@@ -389,6 +439,169 @@ function JoinForm({ setError, setSuccess, loading, setLoading }) {
           </option>
         </select>
       </div>
+
+      {formData.role === "ETUDIANT" && (
+        <div className="space-y-4 pt-2 border-t border-slate-900">
+          <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide pt-3">
+            Dossier élève
+          </p>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="photo" className="text-slate-300">
+              Photo
+            </Label>
+            <input
+              id="photo"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+              className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-slate-800 file:text-slate-200 file:text-xs hover:file:bg-slate-700"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="date_naissance" className="text-slate-300">
+                Date de naissance *
+              </Label>
+              <Input
+                id="date_naissance"
+                type="date"
+                name="date_naissance"
+                value={formData.date_naissance}
+                onChange={handleChange}
+                required
+                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lieu_naissance" className="text-slate-300">
+                Lieu de naissance *
+              </Label>
+              <Input
+                id="lieu_naissance"
+                name="lieu_naissance"
+                value={formData.lieu_naissance}
+                onChange={handleChange}
+                placeholder="Antananarivo"
+                required
+                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="nationalite" className="text-slate-300">
+              Nationalité
+            </Label>
+            <Input
+              id="nationalite"
+              name="nationalite"
+              value={formData.nationalite}
+              onChange={handleChange}
+              className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="adresse" className="text-slate-300">
+              Adresse
+            </Label>
+            <Input
+              id="adresse"
+              name="adresse"
+              value={formData.adresse}
+              onChange={handleChange}
+              className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="telephone" className="text-slate-300">
+              Téléphone
+            </Label>
+            <Input
+              id="telephone"
+              name="telephone"
+              value={formData.telephone}
+              onChange={handleChange}
+              className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="situation_familiale" className="text-slate-300">
+              Situation familiale
+            </Label>
+            <Input
+              id="situation_familiale"
+              name="situation_familiale"
+              value={formData.situation_familiale}
+              onChange={handleChange}
+              placeholder="Ex: Vit avec ses parents"
+              className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ancien_etablissement" className="text-slate-300">
+              Ancien établissement
+            </Label>
+            <Input
+              id="ancien_etablissement"
+              name="ancien_etablissement"
+              value={formData.ancien_etablissement}
+              onChange={handleChange}
+              className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="dossier_medical" className="text-slate-300">
+              Dossier médical
+            </Label>
+            <textarea
+              id="dossier_medical"
+              name="dossier_medical"
+              value={formData.dossier_medical}
+              onChange={handleChange}
+              rows={2}
+              placeholder="Allergies, traitements en cours..."
+              className="w-full px-3 py-2 rounded-md border border-slate-800 bg-slate-900 text-slate-100 placeholder:text-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="contact_urgence_nom" className="text-slate-300">
+                Contact d'urgence
+              </Label>
+              <Input
+                id="contact_urgence_nom"
+                name="contact_urgence_nom"
+                value={formData.contact_urgence_nom}
+                onChange={handleChange}
+                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="contact_urgence_telephone"
+                className="text-slate-300"
+              >
+                Téléphone urgence
+              </Label>
+              <Input
+                id="contact_urgence_telephone"
+                name="contact_urgence_telephone"
+                value={formData.contact_urgence_telephone}
+                onChange={handleChange}
+                className="bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-500 focus-visible:ring-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Button
         type="submit"

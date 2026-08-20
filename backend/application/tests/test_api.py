@@ -21,6 +21,7 @@ class RegisterViewTests(APITestCase):
         response = self.client.post('/api/auth/register/', {
             'email': 'eleve@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         user = User.objects.get(email='eleve@example.com')
@@ -31,6 +32,7 @@ class RegisterViewTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'eleve2@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         response = self.client.post('/api/auth/token/', {
             'email': 'eleve2@example.com', 'password': 'Test1234!',
@@ -217,10 +219,12 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.a@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole_a.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         self.client.post('/api/auth/register/', {
             'email': 'candidat.b@example.com', 'password': 'Test1234!',
             'first_name': 'C', 'last_name': 'D', 'role': 'ETUDIANT', 'ecole': ecole_b.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         self.client.force_authenticate(user=admin)
 
@@ -243,6 +247,7 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.valide@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         candidat = User.objects.get(email='candidat.valide@example.com')
         self.client.force_authenticate(user=admin)
@@ -263,6 +268,7 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.rejete@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         candidat = User.objects.get(email='candidat.rejete@example.com')
         self.client.force_authenticate(user=admin)
@@ -277,6 +283,7 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.dossier@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         candidat = User.objects.get(email='candidat.dossier@example.com')
         self.client.force_authenticate(user=admin)
@@ -292,6 +299,7 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.paye@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         candidat = User.objects.get(email='candidat.paye@example.com')
         self.client.force_authenticate(user=secretaire)
@@ -311,6 +319,7 @@ class DemandeInscriptionTests(APITestCase):
         self.client.post('/api/auth/register/', {
             'email': 'candidat.piece@example.com', 'password': 'Test1234!',
             'first_name': 'A', 'last_name': 'B', 'role': 'ETUDIANT', 'ecole': ecole.id,
+            'date_naissance': '2010-01-01', 'lieu_naissance': 'Antananarivo',
         })
         candidat = User.objects.get(email='candidat.piece@example.com')
         self.client.force_authenticate(user=admin)

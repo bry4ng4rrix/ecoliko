@@ -27,8 +27,17 @@ class AuthService {
   }
 
   /// Auto-inscription élève/parent (compte en attente de validation par l'établissement) —
-  /// miroir de `authService.register` / `JoinForm` (frontend/src/pages/Register.jsx).
-  Future<void> register(Map<String, dynamic> payload) async {
+  /// miroir de `authService.register` / `JoinForm` (frontend/src/pages/Register.jsx). [photo]
+  /// optionnelle (rôle Élève uniquement) : photo du dossier étudiant créé côté serveur.
+  Future<void> register(Map<String, dynamic> payload, {XFile? photo}) async {
+    if (photo != null) {
+      final form = FormData.fromMap({
+        ...payload,
+        'photo': MultipartFile.fromBytes(await photo.readAsBytes(), filename: photo.name),
+      });
+      await _dio.post('/auth/register/', data: form);
+      return;
+    }
     await _dio.post('/auth/register/', data: payload);
   }
 
