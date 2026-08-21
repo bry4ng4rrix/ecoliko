@@ -18,6 +18,8 @@ import {
   Phone,
   Mail,
   Star,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -696,6 +698,7 @@ const MOIS_LABELS = [
 
 const STATUT_PAIEMENT_VARIANT = {
   PAYE: "default",
+  PARTIEL: "outline",
   EN_ATTENTE: "secondary",
   EN_RETARD: "destructive",
   ANNULE: "secondary",
@@ -723,6 +726,9 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   );
   const createPaiement = useCreateResource("paiements", paiementService);
   const updatePaiement = useUpdateResource("paiements", paiementService);
+  // Modale « Marquer payé » (montant dû, déjà payé, saisie du montant versé — total ou
+  // partiel) — voir `PaiementModal` plus bas. `null` quand fermée.
+  const [modalPaiement, setModalPaiement] = useState(null);
 
   const { data: dossier, isLoading: loadingDossier } = useQuery({
     queryKey: ["dossier-financier", etudiant.id, anneeActive?.id],
@@ -792,6 +798,9 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
   const paiementInscription = mesPaiements.find(
     (p) => p.commentaire === MARQUEUR_INSCRIPTION,
   );
+  const inscriptionMontantPaye = Number(paiementInscription?.montant_paye ?? 0);
+  const inscriptionEstPartiel =
+    paiementInscription?.statut === "PARTIEL" && !droitInscriptionPaye;
 
   const paiementsParMois = (mois) =>
     mesPaiements.filter(
@@ -825,34 +834,58 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     });
   };
 
-  const handleMarquerPaye = async (mois) => {
+  const handleMarquerPaye = (mois) => {
     const existant = paiementsParMois(mois)[0];
-    try {
-      if (existant) {
-        await updatePaiement.mutateAsync({
-          id: existant.id,
-          payload: { statut: "PAYE" },
-        });
-      } else {
-        await createPaiement.mutateAsync({
-          etudiant: etudiant.id,
-          annee_scolaire: anneeActive.id,
-          montant: montantEcolageMensuel ?? 0,
-          date_echeance: dateEcheancePourMois(mois),
-          mois_couvert: mois,
-          statut: "PAYE",
-        });
-      }
-      invaliderFinance();
-      toast.success("Mois marqué comme payé.");
-    } catch (err) {
-      const data = err.response?.data;
-      toast.error(
-        data
-          ? Object.values(data).flat().join(" ")
-          : "Erreur lors de la mise à jour.",
-      );
-    }
+    // Le montant dû de la ligne existante prime sur le tarif mensuel recalculé : ce dernier
+    // peut avoir changé depuis la création de la ligne (tarif classe modifié en cours
+    // d'année), alors que c'est bien le `montant` déjà enregistré sur CETTE échéance qui
+    // détermine ce qu'il reste à percevoir dessus.
+    const montantDu = existant
+      ? Number(existant.montant)
+      : (montantEcolageMensuel ?? 0);
+    const montantDejaPaye = existant ? Number(existant.montant_paye ?? 0) : 0;
+    const dateInitiale =
+      existant?.date_paiement ?? new Date().toISOString().slice(0, 10);
+
+    setModalPaiement({
+      titre: `Écolage — ${MOIS_LABELS[mois - 1]}`,
+      montantDu,
+      montantDejaPaye,
+      dateInitiale,
+      onMettreAJourDate: existant
+        ? async (date) => {
+            await updatePaiement.mutateAsync({
+              id: existant.id,
+              payload: { date_paiement: date },
+            });
+            invaliderFinance();
+          }
+        : null,
+      onConfirmer: async (nouveauMontantPaye, datePaiement) => {
+        if (existant) {
+          await updatePaiement.mutateAsync({
+            id: existant.id,
+            payload: { montant_paye: nouveauMontantPaye, date_paiement: datePaiement },
+          });
+        } else {
+          await createPaiement.mutateAsync({
+            etudiant: etudiant.id,
+            annee_scolaire: anneeActive.id,
+            montant: montantDu,
+            montant_paye: nouveauMontantPaye,
+            date_paiement: datePaiement,
+            date_echeance: dateEcheancePourMois(mois),
+            mois_couvert: mois,
+          });
+        }
+        invaliderFinance();
+        toast.success(
+          nouveauMontantPaye >= montantDu
+            ? "Mois marqué comme payé."
+            : "Paiement partiel enregistré.",
+        );
+      },
+    });
   };
 
   const handleMarquerNonPaye = async (mois) => {
@@ -897,44 +930,74 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
     }
   };
 
-  // Bascule le droit d'inscription/réinscription payé ⇄ non payé. Crée ou met à jour un
-  // `PaiementEcolage` sans `mois_couvert` (même mécanisme que `handleMarquerPaye`/
-  // `handleMarquerNonPaye` pour l'écolage mensuel) plutôt que de patcher
+  // Marque le droit d'inscription/réinscription payé (via la modale, montant partiel
+  // possible). Crée ou met à jour un `PaiementEcolage` sans `mois_couvert` (même mécanisme
+  // que `handleMarquerPaye` pour l'écolage mensuel) plutôt que de patcher
   // `DemandeInscriptionSuivi` (qui ne sert que pour l'instruction initiale d'une demande
   // d'inscription et n'a aucune incidence sur `droitInscriptionPaye` ni sur
-  // `services.facture_ecolage.est_inscription_payee` côté backend — l'ancien code mettait
-  // donc à jour un champ que rien ne relisait ici).
-  const handleToggleInscriptionPaye = async () => {
+  // `services.facture_ecolage.est_inscription_payee` côté backend).
+  const handleMarquerInscriptionPaye = () => {
+    const montantDu = paiementInscription
+      ? Number(paiementInscription.montant)
+      : (montantInscription ?? 0);
+    const montantDejaPaye = paiementInscription ? inscriptionMontantPaye : 0;
+    const dateInitiale =
+      paiementInscription?.date_paiement ??
+      new Date().toISOString().slice(0, 10);
+
+    setModalPaiement({
+      titre: "Droit d'inscription",
+      montantDu,
+      montantDejaPaye,
+      dateInitiale,
+      onMettreAJourDate: paiementInscription
+        ? async (date) => {
+            await updatePaiement.mutateAsync({
+              id: paiementInscription.id,
+              payload: { date_paiement: date },
+            });
+            invaliderFinance();
+          }
+        : null,
+      onConfirmer: async (nouveauMontantPaye, datePaiement) => {
+        if (paiementInscription) {
+          await updatePaiement.mutateAsync({
+            id: paiementInscription.id,
+            payload: { montant_paye: nouveauMontantPaye, date_paiement: datePaiement },
+          });
+        } else {
+          await createPaiement.mutateAsync({
+            etudiant: etudiant.id,
+            annee_scolaire: anneeActive.id,
+            montant: montantDu,
+            montant_paye: nouveauMontantPaye,
+            date_paiement: datePaiement,
+            date_echeance: anneeActive.date_debut,
+            mois_couvert: anneeActive.mois_debut_annee_scolaire ?? 9,
+            commentaire: MARQUEUR_INSCRIPTION,
+          });
+        }
+        invaliderFinance();
+        toast.success(
+          nouveauMontantPaye >= montantDu
+            ? "Droit d'inscription marqué comme payé."
+            : "Paiement partiel enregistré.",
+        );
+      },
+    });
+  };
+
+  const handleMarquerInscriptionNonPaye = async () => {
+    if (!paiementInscription) return;
     try {
-      if (paiementInscription) {
-        await updatePaiement.mutateAsync({
-          id: paiementInscription.id,
-          payload: { statut: droitInscriptionPaye ? "EN_ATTENTE" : "PAYE" },
-        });
-      } else {
-        await createPaiement.mutateAsync({
-          etudiant: etudiant.id,
-          annee_scolaire: anneeActive.id,
-          montant: montantInscription ?? 0,
-          date_echeance: anneeActive.date_debut,
-          mois_couvert: anneeActive.mois_debut_annee_scolaire ?? 9,
-          statut: "PAYE",
-          commentaire: MARQUEUR_INSCRIPTION,
-        });
-      }
+      await updatePaiement.mutateAsync({
+        id: paiementInscription.id,
+        payload: { statut: "EN_ATTENTE" },
+      });
       invaliderFinance();
-      toast.success(
-        droitInscriptionPaye
-          ? "Droit d'inscription marqué comme non payé."
-          : "Droit d'inscription marqué comme payé.",
-      );
-    } catch (err) {
-      const data = err.response?.data;
-      toast.error(
-        data
-          ? Object.values(data).flat().join(" ")
-          : "Erreur lors de la mise à jour.",
-      );
+      toast.success("Droit d'inscription marqué comme non payé.");
+    } catch {
+      toast.error("Erreur lors de la mise à jour.");
     }
   };
 
@@ -1031,13 +1094,26 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                           ? `${Number(montantInscription).toLocaleString("fr-FR")} Ar`
                           : "—"}
                       </span>
-                      <Badge
-                        variant={
-                          droitInscriptionPaye ? "default" : "destructive"
-                        }
-                      >
-                        {droitInscriptionPaye ? "Payé" : "Pas encore payé"}
-                      </Badge>
+                      {inscriptionEstPartiel ? (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        >
+                          Partiel — reste{" "}
+                          {(
+                            (montantInscription ?? 0) - inscriptionMontantPaye
+                          ).toLocaleString("fr-FR")}{" "}
+                          Ar
+                        </Badge>
+                      ) : (
+                        <Badge
+                          variant={
+                            droitInscriptionPaye ? "default" : "destructive"
+                          }
+                        >
+                          {droitInscriptionPaye ? "Payé" : "Pas encore payé"}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -1047,19 +1123,23 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                       >
                         Générer facture
                       </button>
-                      <button
-                        type="button"
-                        onClick={handleToggleInscriptionPaye}
-                        className={
-                          droitInscriptionPaye
-                            ? "text-xs px-2 py-1 bg-orange-500/20 text-orange-700 rounded hover:bg-orange-500/30 font-medium"
-                            : "text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
-                        }
-                      >
-                        {droitInscriptionPaye
-                          ? "Marquer non payé"
-                          : "Marquer payé"}
-                      </button>
+                      {droitInscriptionPaye ? (
+                        <button
+                          type="button"
+                          onClick={handleMarquerInscriptionNonPaye}
+                          className="text-xs px-2 py-1 bg-orange-500/20 text-orange-700 rounded hover:bg-orange-500/30 font-medium"
+                        >
+                          Marquer non payé
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleMarquerInscriptionPaye}
+                          className="text-xs px-2 py-1 bg-green-500/20 text-green-700 rounded hover:bg-green-500/30 font-medium"
+                        >
+                          Marquer payé
+                        </button>
+                      )}
                     </div>
                   </div>
                   <div className="flex-1 min-w-[200px] bg-muted rounded-lg px-3 py-2 flex justify-between items-center">
@@ -1127,19 +1207,30 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                           </tr>
                         );
                       }
-                      return lignes.map((p) => (
+                      return lignes.map((p) => {
+                        const estPartiel = p.statut === "PARTIEL";
+                        return (
                         <tr key={p.id}>
                           <td className="px-3 py-2">{label}</td>
                           <td className="px-3 py-2 font-mono">
-                            {Number(p.montant).toLocaleString("fr-FR")} Ar
+                            {estPartiel
+                              ? `${Number(p.montant_paye ?? 0).toLocaleString("fr-FR")} / ${Number(p.montant).toLocaleString("fr-FR")} Ar`
+                              : `${Number(p.montant).toLocaleString("fr-FR")} Ar`}
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">
-                            {p.date_paiement}
+                            {estPartiel
+                              ? `Reste : ${Number(p.reste ?? 0).toLocaleString("fr-FR")} Ar`
+                              : p.date_paiement}
                           </td>
                           <td className="px-3 py-2">
                             <Badge
                               variant={
                                 STATUT_PAIEMENT_VARIANT[p.statut] ?? "secondary"
+                              }
+                              className={
+                                estPartiel
+                                  ? "border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                  : undefined
                               }
                             >
                               {p.statut}
@@ -1173,6 +1264,14 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                                   Marquer non payé
                                 </button>
                               </div>
+                            ) : estPartiel ? (
+                              <button
+                                type="button"
+                                onClick={() => handleMarquerPaye(mois)}
+                                className="text-xs px-2 py-1 bg-amber-500/20 text-amber-700 rounded hover:bg-amber-500/30 font-medium"
+                              >
+                                Mettre à jour
+                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -1184,7 +1283,8 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
                             )}
                           </td>
                         </tr>
-                      ));
+                        );
+                      });
                     })}
                   </tbody>
                 </table>
@@ -1192,6 +1292,182 @@ function PaiementsEtudiantDialog({ etudiant, onClose }) {
             </div>
           </div>
         )}
+      </DialogContent>
+      {modalPaiement && (
+        <PaiementModal
+          {...modalPaiement}
+          onClose={() => setModalPaiement(null)}
+        />
+      )}
+    </Dialog>
+  );
+}
+
+/** Modale « Marquer payé » : montre le montant dû, le déjà-payé, un champ « montant versé
+
+ * maintenant » (pré-rempli avec le reste, modifiable pour un paiement partiel — l'aperçu
+ * nouveau total payé / reste / total ou partiel se recalcule en direct à la saisie), et un
+ * champ « date de paiement » avec, à côté, un bouton pour mettre à jour SEULEMENT la date
+ * d'une ligne déjà existante (visible uniquement si `onMettreAJourDate` est fourni — rien à
+ * mettre à jour sur une ligne pas encore créée). Miroir de `_ouvrirModalPaiement`
+ * (cross/lib/features/admin/widgets/paiements_etudiant_sheet.dart).
+ */
+function PaiementModal({
+  titre,
+  montantDu,
+  montantDejaPaye,
+  dateInitiale,
+  onMettreAJourDate,
+  onConfirmer,
+  onClose,
+}) {
+  const reste = Math.max(montantDu - montantDejaPaye, 0);
+  const [montantVerse, setMontantVerse] = useState(String(reste));
+  const [datePaiement, setDatePaiement] = useState(dateInitiale);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [dateEnCours, setDateEnCours] = useState(false);
+
+  const saisi = Number(montantVerse) || 0;
+  const nouveauTotal = montantDejaPaye + saisi;
+  const nouveauReste = Math.max(montantDu - nouveauTotal, 0);
+  const totalement = nouveauTotal >= montantDu;
+
+  const handleConfirmer = async () => {
+    setEnvoiEnCours(true);
+    try {
+      await onConfirmer(nouveauTotal, datePaiement);
+      onClose();
+    } catch (err) {
+      const data = err.response?.data;
+      toast.error(
+        data
+          ? Object.values(data).flat().join(" ")
+          : "Erreur lors de la mise à jour.",
+      );
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  };
+
+  const handleMettreAJourDate = async () => {
+    setDateEnCours(true);
+    try {
+      await onMettreAJourDate(datePaiement);
+      toast.success("Date de paiement mise à jour.");
+    } catch (err) {
+      const data = err.response?.data;
+      toast.error(
+        data
+          ? Object.values(data).flat().join(" ")
+          : "Erreur lors de la mise à jour.",
+      );
+    } finally {
+      setDateEnCours(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{titre}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Montant dû</span>
+            <span className="font-bold font-mono">
+              {montantDu.toLocaleString("fr-FR")} Ar
+            </span>
+          </div>
+          {montantDejaPaye > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Déjà payé</span>
+              <span className="font-bold font-mono">
+                {montantDejaPaye.toLocaleString("fr-FR")} Ar
+              </span>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">
+              Montant versé maintenant
+            </label>
+            <Input
+              type="number"
+              min={0}
+              value={montantVerse}
+              onChange={(e) => setMontantVerse(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs text-muted-foreground">
+              Date de paiement
+            </label>
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                value={datePaiement}
+                onChange={(e) => setDatePaiement(e.target.value)}
+                className="flex-1"
+              />
+              {onMettreAJourDate && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleMettreAJourDate}
+                  disabled={dateEnCours}
+                >
+                  {dateEnCours ? "..." : "Mettre à jour"}
+                </Button>
+              )}
+            </div>
+          </div>
+          <div
+            className={`rounded-lg p-3 text-sm space-y-1.5 border ${
+              totalement
+                ? "bg-emerald-500/10 border-emerald-500/30"
+                : "bg-amber-500/10 border-amber-500/30"
+            }`}
+          >
+            <p
+              className={`font-semibold flex items-center gap-1.5 ${
+                totalement
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-amber-700 dark:text-amber-400"
+              }`}
+            >
+              {totalement ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <Clock className="w-4 h-4" />
+              )}
+              {totalement ? "Payé en totalité" : "Paiement partiel — reste dû"}
+            </p>
+            <div className="flex justify-between">
+              <span>Nouveau total payé</span>
+              <span className="font-bold font-mono">
+                {nouveauTotal.toLocaleString("fr-FR")} Ar
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span>Reste à payer</span>
+              <span className="font-bold font-mono">
+                {nouveauReste.toLocaleString("fr-FR")} Ar
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onClose} disabled={envoiEnCours}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleConfirmer}
+            disabled={envoiEnCours || saisi <= 0}
+          >
+            {envoiEnCours ? "Enregistrement..." : "Confirmer"}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/api/error_message.dart';
@@ -28,6 +29,144 @@ const _moisLabels = [
   '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
+
+/// Modale « Marquer payé » : montre le montant dû, le déjà-payé, un champ « montant versé
+/// maintenant » (pré-rempli avec le reste, modifiable pour un paiement partiel — l'aperçu
+/// nouveau total payé / reste / badge total ou partiel se recalcule en direct à la saisie), et
+/// un champ « date de paiement » avec, à côté, un bouton pour mettre à jour SEULEMENT la date
+/// d'une ligne déjà existante (visible uniquement si [onMettreAJourDate] est fourni — rien à
+/// mettre à jour sur une ligne pas encore créée). Renvoie `(montantPaye, datePaiement)` à
+/// envoyer au backend pour la création/mise à jour principale, ou `null` si annulé.
+Future<({num montantPaye, String datePaiement})?> _ouvrirModalPaiement(
+  BuildContext context, {
+  required String titre,
+  required num montantDu,
+  required num montantDejaPaye,
+  required String dateInitiale,
+  Future<void> Function(String date)? onMettreAJourDate,
+}) {
+  final reste = (montantDu - montantDejaPaye).clamp(0, montantDu);
+  final ctrl = TextEditingController(text: reste.toStringAsFixed(0));
+  DateTime dateSelectionnee = DateTime.tryParse(dateInitiale) ?? DateTime.now();
+
+  return showDialog<({num montantPaye, String datePaiement})>(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setModalState) {
+        final saisi = num.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0;
+        final nouveauTotal = montantDejaPaye + saisi;
+        final nouveauReste = (montantDu - nouveauTotal).clamp(0, montantDu);
+        final totalement = nouveauTotal >= montantDu;
+        final couleur = totalement ? Colors.green : Colors.orange;
+        final dateFormatee = DateFormat('yyyy-MM-dd').format(dateSelectionnee);
+
+        return AlertDialog(
+          title: Text(titre),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ligneInfo('Montant dû', '${montantDu.toStringAsFixed(0)} Ar'),
+                if (montantDejaPaye > 0) _ligneInfo('Déjà payé', '${montantDejaPaye.toStringAsFixed(0)} Ar'),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Montant versé maintenant', suffixText: 'Ar'),
+                  onChanged: (_) => setModalState(() {}),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () async {
+                          final choisie = await showDatePicker(
+                            context: context,
+                            initialDate: dateSelectionnee,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                          );
+                          if (choisie != null) setModalState(() => dateSelectionnee = choisie);
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(labelText: 'Date de paiement', border: OutlineInputBorder(), isDense: true),
+                          child: Text(DateFormat('dd/MM/yyyy').format(dateSelectionnee)),
+                        ),
+                      ),
+                    ),
+                    if (onMettreAJourDate != null) ...[
+                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: () async {
+                          await onMettreAJourDate(dateFormatee);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Date de paiement mise à jour.')));
+                          }
+                        },
+                        child: const Text('Mettre à jour'),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: couleur.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: couleur.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(totalement ? Icons.check_circle_rounded : Icons.pending_rounded, size: 16, color: couleur.shade700),
+                          const SizedBox(width: 6),
+                          Text(
+                            totalement ? 'Payé en totalité' : 'Paiement partiel — reste dû',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5, color: couleur.shade700),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      _ligneInfo('Nouveau total payé', '${nouveauTotal.toStringAsFixed(0)} Ar'),
+                      _ligneInfo('Reste à payer', '${nouveauReste.toStringAsFixed(0)} Ar'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Annuler')),
+            FilledButton(
+              onPressed: saisi > 0 ? () => Navigator.of(context).pop((montantPaye: nouveauTotal, datePaiement: dateFormatee)) : null,
+              child: const Text('Confirmer'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
+
+Widget _ligneInfo(String label, String valeur) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 12.5)),
+          Text(valeur, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5)),
+        ],
+      ),
+    );
 
 /// Marqueur distinguant un `PaiementEcolage` "droit d'inscription/réinscription" d'un
 /// paiement d'écolage mensuel ordinaire — `mois_couvert` étant obligatoire côté backend,
@@ -92,24 +231,49 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
     return '$annee-${mois.toString().padLeft(2, '0')}-${jourEcheance.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _marquerPaye(Map<String, dynamic> anneeActive, List<Map<String, dynamic>> paiementsDuMois, int mois, num? montantEcolageMensuel) {
+  Future<void> _marquerPaye(Map<String, dynamic> anneeActive, List<Map<String, dynamic>> paiementsDuMois, int mois, num? montantEcolageMensuel) async {
+    final existant = paiementsDuMois.isNotEmpty ? paiementsDuMois.first : null;
+    // Le montant dû de la ligne existante prime sur le tarif mensuel recalculé : ce dernier
+    // peut avoir changé depuis la création de la ligne (tarif classe modifié en cours
+    // d'année), alors que c'est bien le `montant` déjà enregistré sur CETTE échéance qui
+    // détermine ce qu'il reste à percevoir dessus.
+    final montantDu = existant != null ? (_num(existant['montant']) ?? montantEcolageMensuel ?? 0) : (montantEcolageMensuel ?? 0);
+    final dejaPaye = _num(existant?['montant_paye']) ?? 0;
+    final dateInitiale = existant?['date_paiement']?.toString() ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final resultat = await _ouvrirModalPaiement(
+      context,
+      titre: 'Écolage — ${_moisLabels[mois]}',
+      montantDu: montantDu,
+      montantDejaPaye: dejaPaye,
+      dateInitiale: dateInitiale,
+      onMettreAJourDate: existant == null
+          ? null
+          : (date) async {
+              await ApiClient.instance.dio.patch('/paiements/${existant['id']}/', data: {'date_paiement': date});
+              _invaliderFinance();
+            },
+    );
+    if (resultat == null || !mounted) return;
+
     return _executer('mois-$mois', () async {
-      final existant = paiementsDuMois.isNotEmpty ? paiementsDuMois.first : null;
       final dio = ApiClient.instance.dio;
       if (existant != null) {
-        await dio.patch('/paiements/${existant['id']}/', data: {'statut': 'PAYE'});
+        await dio.patch('/paiements/${existant['id']}/', data: {'montant_paye': resultat.montantPaye, 'date_paiement': resultat.datePaiement});
       } else {
         await dio.post('/paiements/', data: {
           'etudiant': _etudiantId,
           'annee_scolaire': anneeActive['id'],
-          'montant': montantEcolageMensuel ?? 0,
+          'montant': montantDu,
+          'montant_paye': resultat.montantPaye,
+          'date_paiement': resultat.datePaiement,
           'date_echeance': _dateEcheancePourMois(anneeActive, mois),
           'mois_couvert': mois,
-          'statut': 'PAYE',
         });
       }
       _invaliderFinance();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mois marqué comme payé.')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resultat.montantPaye >= montantDu ? 'Mois marqué comme payé.' : 'Paiement partiel enregistré.')));
+      }
     });
   }
 
@@ -122,31 +286,58 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
     });
   }
 
-  Future<void> _toggleInscriptionPaye(Map<String, dynamic> anneeActive, Map<String, dynamic>? paiementInscription, bool dejaPaye, num? montantInscription) {
+  Future<void> _marquerInscriptionPaye(Map<String, dynamic> anneeActive, Map<String, dynamic>? paiementInscription, num? montantInscription) async {
+    final montantDu = paiementInscription != null
+        ? (_num(paiementInscription['montant']) ?? montantInscription ?? 0)
+        : (montantInscription ?? 0);
+    final dejaPaye = _num(paiementInscription?['montant_paye']) ?? 0;
+    final dateInitiale = paiementInscription?['date_paiement']?.toString() ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final resultat = await _ouvrirModalPaiement(
+      context,
+      titre: "Droit d'inscription",
+      montantDu: montantDu,
+      montantDejaPaye: dejaPaye,
+      dateInitiale: dateInitiale,
+      onMettreAJourDate: paiementInscription == null
+          ? null
+          : (date) async {
+              await ApiClient.instance.dio.patch('/paiements/${paiementInscription['id']}/', data: {'date_paiement': date});
+              _invaliderFinance();
+            },
+    );
+    if (resultat == null || !mounted) return;
+
     return _executer('inscription', () async {
       final dio = ApiClient.instance.dio;
       if (paiementInscription != null) {
-        await dio.patch('/paiements/${paiementInscription['id']}/', data: {'statut': dejaPaye ? 'EN_ATTENTE' : 'PAYE'});
+        await dio.patch('/paiements/${paiementInscription['id']}/', data: {'montant_paye': resultat.montantPaye, 'date_paiement': resultat.datePaiement});
       } else {
-        // `dejaPaye` peut être vrai sans qu'un paiement "droit d'inscription" taggé
-        // n'existe encore (le statut se déduit aussi du cumul des écolages mensuels déjà
-        // payés, voir `droitInscriptionPaye` plus bas) — si l'action demandée est "marquer
-        // non payé" dans ce cas, créer quand même un enregistrement PAYE serait contraire à
-        // l'action cliquée.
         await dio.post('/paiements/', data: {
           'etudiant': _etudiantId,
           'annee_scolaire': anneeActive['id'],
-          'montant': montantInscription ?? 0,
+          'montant': montantDu,
+          'montant_paye': resultat.montantPaye,
+          'date_paiement': resultat.datePaiement,
           'date_echeance': anneeActive['date_debut'],
           'mois_couvert': (anneeActive['mois_debut_annee_scolaire'] as num?)?.toInt() ?? 9,
-          'statut': dejaPaye ? 'EN_ATTENTE' : 'PAYE',
           'commentaire': _marqueurInscription,
         });
       }
       _invaliderFinance();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(dejaPaye ? "Droit d'inscription marqué comme non payé." : "Droit d'inscription marqué comme payé.")));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(resultat.montantPaye >= montantDu ? "Droit d'inscription marqué comme payé." : 'Paiement partiel enregistré.'),
+        ));
       }
+    });
+  }
+
+  Future<void> _marquerInscriptionNonPaye(Map<String, dynamic>? paiementInscription) {
+    return _executer('inscription', () async {
+      if (paiementInscription == null) return;
+      await ApiClient.instance.dio.patch('/paiements/${paiementInscription['id']}/', data: {'statut': 'EN_ATTENTE'});
+      _invaliderFinance();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Droit d'inscription marqué comme non payé.")));
     });
   }
 
@@ -257,6 +448,8 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
 
                           final paiementInscription = mesPaiements.where((p) => p['commentaire'] == _marqueurInscription).toList();
                           final paiementInscriptionRecord = paiementInscription.isNotEmpty ? paiementInscription.first : null;
+                          final inscriptionMontantPaye = _num(paiementInscriptionRecord?['montant_paye']) ?? 0;
+                          final inscriptionEstPartiel = paiementInscriptionRecord?['statut'] == 'PARTIEL' && !droitInscriptionPaye;
 
                           List<Map<String, dynamic>> paiementsParMois(int mois) =>
                               mesPaiements.where((p) => p['mois_couvert'] == mois && p['commentaire'] != _marqueurInscription).toList();
@@ -308,7 +501,10 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
                                         children: [
                                           Text(estReinscription ? "Droit de réinscription" : "Droit d'inscription", style: const TextStyle(fontWeight: FontWeight.w600)),
                                           Text(montantInscription != null ? '$montantInscription Ar' : '—', style: const TextStyle(fontFamily: 'monospace')),
-                                          _badge(droitInscriptionPaye ? 'Payé' : 'Pas encore payé', droitInscriptionPaye ? Colors.green : Colors.red),
+                                          if (inscriptionEstPartiel)
+                                            _badge('Partiel — reste ${(montantInscription != null ? montantInscription - inscriptionMontantPaye : 0).toStringAsFixed(0)} Ar', Colors.orange)
+                                          else
+                                            _badge(droitInscriptionPaye ? 'Payé' : 'Pas encore payé', droitInscriptionPaye ? Colors.green : Colors.red),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
@@ -326,7 +522,9 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
                                             droitInscriptionPaye ? 'Marquer non payé' : 'Marquer payé',
                                             droitInscriptionPaye ? Colors.orange : Colors.green,
                                             _actionEnCours == 'inscription',
-                                            () => _toggleInscriptionPaye(anneeActive, paiementInscriptionRecord, droitInscriptionPaye, montantInscription),
+                                            () => droitInscriptionPaye
+                                                ? _marquerInscriptionNonPaye(paiementInscriptionRecord)
+                                                : _marquerInscriptionPaye(anneeActive, paiementInscriptionRecord, montantInscription),
                                           ),
                                         ],
                                       ),
@@ -373,11 +571,16 @@ class _PaiementsContentState extends ConsumerState<_PaiementsContent> {
                                 return Column(
                                   children: lignes.map((p) {
                                     final statut = p['statut']?.toString() ?? 'EN_ATTENTE';
+                                    final estPartiel = statut == 'PARTIEL';
+                                    final montantPaye = _num(p['montant_paye']) ?? 0;
+                                    final reste = _num(p['reste']) ?? 0;
                                     return _ligneMois(
                                       context,
                                       label: _moisLabels[mois],
-                                      montant: '${p['montant'] ?? 0} Ar',
-                                      sousTitre: p['date_paiement']?.toString() ?? '',
+                                      montant: estPartiel ? '${montantPaye.toStringAsFixed(0)} / ${p['montant'] ?? 0} Ar' : '${p['montant'] ?? 0} Ar',
+                                      sousTitre: estPartiel
+                                          ? 'Reste : ${reste.toStringAsFixed(0)} Ar'
+                                          : (p['date_paiement']?.toString() ?? ''),
                                       badge: _badge(_statutLabels[statut] ?? statut, _statutColors[statut] ?? Colors.grey),
                                       actions: dejaPaye
                                           ? [

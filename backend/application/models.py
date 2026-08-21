@@ -985,6 +985,7 @@ class PaiementEcolage(models.Model):
 
     class StatutPaiement(models.TextChoices):
         EN_ATTENTE = 'EN_ATTENTE', _('En attente')
+        PARTIEL = 'PARTIEL', _('Partiel')
         PAYE = 'PAYE', _('Payé')
         ANNULE = 'ANNULE', _('Annulé')
         EN_RETARD = 'EN_RETARD', _('En retard')
@@ -1004,7 +1005,19 @@ class PaiementEcolage(models.Model):
     montant = models.DecimalField(
         _('montant'),
         max_digits=10,
-        decimal_places=2
+        decimal_places=2,
+        help_text=_('Montant dû pour cette échéance (mensualité ou droit d\'inscription).'),
+    )
+    montant_paye = models.DecimalField(
+        _('montant payé'),
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0'),
+        help_text=_(
+            "Montant effectivement versé à ce jour — peut être inférieur à `montant` "
+            "(paiement partiel, statut PARTIEL) ; le statut est déduit de ces deux valeurs "
+            "par le serializer plutôt que saisi indépendamment (voir PaiementEcolageSerializer)."
+        ),
     )
     date_paiement = models.DateField(
         _('date de paiement'),
@@ -1072,6 +1085,31 @@ class PaiementEcolage(models.Model):
 
     def est_en_retard(self):
         return self.date_echeance < timezone.now().date() and self.statut != self.StatutPaiement.PAYE
+
+    def save(self, *args, **kwargs):
+        """Garde `statut` cohérent avec `montant_paye`, quel que soit le point d'entrée (API
+
+        via `montant_paye` pour un paiement partiel, ancien flux API/admin Django/scripts/
+        fixtures qui ne fixent que `statut=PAYE`) — dans `save()` plutôt que dans le
+        serializer pour s'appliquer uniformément, y compris à la création directe via l'ORM.
+
+        Ne gère PAS le sens inverse (statut='EN_ATTENTE' envoyé seul, sans `montant_paye`,
+        pour "marquer non payé") : `self.montant_paye` à ce stade peut être une ancienne
+        valeur non intentionnellement touchée par cet appel (ex. un `PATCH` partiel) — seul le
+        serializer sait, via `validated_data`, si le client a réellement voulu la remettre à
+        zéro (voir `PaiementEcolageSerializer.update`).
+        """
+        if self.statut == self.StatutPaiement.ANNULE:
+            pass
+        elif self.statut == self.StatutPaiement.PAYE and self.montant_paye < self.montant:
+            self.montant_paye = self.montant
+        elif self.montant_paye <= 0:
+            self.statut = self.StatutPaiement.EN_ATTENTE
+        elif self.montant_paye >= self.montant:
+            self.statut = self.StatutPaiement.PAYE
+        else:
+            self.statut = self.StatutPaiement.PARTIEL
+        super().save(*args, **kwargs)
 
     def clean(self):
         if self.etudiant_id and self.annee_scolaire_id and self.etudiant.ecole_id != self.annee_scolaire.ecole_id:

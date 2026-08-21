@@ -55,9 +55,11 @@ def frais_attendus(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> Decimal
 
 def dossier_financier(etudiant: Etudiant, annee_scolaire: AnneeScolaire) -> dict:
     total_du = frais_attendus(etudiant, annee_scolaire)
+    # `montant_paye` (pas `montant`) : une ligne PARTIELLE ne compte que ce qui a réellement
+    # été versé, pas le montant dû pour cette échéance (voir PaiementEcolageSerializer).
     total_paye = PaiementEcolage.objects.filter(
-        etudiant=etudiant, annee_scolaire=annee_scolaire, statut=PaiementEcolage.StatutPaiement.PAYE
-    ).aggregate(total=Sum('montant'))['total'] or Decimal('0')
+        etudiant=etudiant, annee_scolaire=annee_scolaire,
+    ).exclude(statut=PaiementEcolage.StatutPaiement.ANNULE).aggregate(total=Sum('montant_paye'))['total'] or Decimal('0')
 
     reste_du = max(total_du - total_paye, Decimal('0'))
 
